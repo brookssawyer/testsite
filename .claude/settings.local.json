@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:site.api.espn.com)",
+      "WebFetch(domain:barttorvik.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

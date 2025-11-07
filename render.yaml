@@ -1,0 +1,52 @@
+# Render Blueprint for Basketball Betting Monitor
+# This file auto-configures both services when you connect to Render
+
+services:
+  # Backend API Server
+  - type: web
+    name: basketball-betting-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python api/main.py
+    envVars:
+      - key: ODDS_API_KEY
+        sync: false  # You'll set this in Render dashboard
+      - key: USE_KENPOM
+        value: false  # Set to true if you have KenPom subscription
+      - key: KENPOM_EMAIL
+        sync: false
+      - key: KENPOM_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true  # Render auto-generates
+      - key: ENVIRONMENT
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PORT
+        value: "8000"
+    healthCheckPath: /health
+
+  # Background Monitor (runs every 30s)
+  - type: worker
+    name: basketball-betting-monitor
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python monitor.py
+    envVars:
+      - key: ODDS_API_KEY
+        sync: false
+      - key: USE_KENPOM
+        value: false
+      - key: KENPOM_EMAIL
+        sync: false
+      - key: KENPOM_PASSWORD
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+# Both services will share the same repo and environment variables

@@ -1,0 +1,381 @@
+"""
+Smart Confidence Scoring Algorithm
+Analyzes team stats and matchup dynamics to calculate bet confidence
+"""
+from typing import Dict, Optional, Tuple
+from loguru import logger
+import config
+
+
+class ConfidenceScorer:
+    """
+    Calculates confidence scores (0-100) for under bets
+    based on team statistics and matchup characteristics
+    """
+
+    def __init__(self, custom_weights: Optional[Dict] = None):
+        """
+        Initialize scorer with weights
+
+        Args:
+            custom_weights: Optional dict to override default weights from config
+        """
+        self.weights = custom_weights or config.CONFIDENCE_WEIGHTS
+
+    def calculate_confidence(
+        self,
+        home_metrics: Dict,
+        away_metrics: Dict,
+        required_ppm: float,
+        current_total: int,
+        ou_line: float,
+        bet_type: Optional[str] = "under",
+        current_ppm: Optional[float] = 0
+    ) -> Dict:
+        """
+        Calculate confidence score for over or under bet
+
+        Args:
+            home_metrics: Home team statistical metrics
+            away_metrics: Away team statistical metrics
+            required_ppm: Required points per minute to hit over
+            current_total: Current total points scored
+            ou_line: Over/under line
+            bet_type: "over" or "under" (default: "under")
+            current_ppm: Current scoring pace (points per minute elapsed)
+
+        Returns:
+            Dict with:
+            - confidence: Score 0-100
+            - unit_recommendation: 0, 0.5, 1, 2, or 3
+            - breakdown: Dict explaining the score
+        """
+        # Determine scoring multiplier (inverse logic for OVER bets)
+        # For UNDER: positive scores for factors favoring under
+        # For OVER: flip the sign (fast pace becomes positive, slow becomes negative)
+        multiplier = -1 if bet_type == "over" else 1
+
+        # Base score: trigger already met
+        score = 50
+        breakdown = {"base": 50, "bet_type": bet_type or "under"}
+
+        # Only proceed if metrics exist for both teams
+        if not home_metrics or not away_metrics:
+            logger.warning("Missing team metrics for confidence calculation")
+            return {
+                "confidence": 0,
+                "unit_recommendation": 0,
+                "breakdown": {"error": "Missing team data"}
+            }
+
+        # === PACE ANALYSIS ===
+        # For UNDER: slow pace is good (positive score)
+        # For OVER: fast pace is good (multiplier flips the score)
+        pace_score, pace_breakdown = self._evaluate_pace(home_metrics, away_metrics)
+        score += pace_score * multiplier
+        breakdown["pace"] = pace_breakdown
+
+        # === 3-POINT ANALYSIS ===
+        # For UNDER: low 3P shooting is good
+        # For OVER: high 3P shooting is good
+        three_score, three_breakdown = self._evaluate_three_point(home_metrics, away_metrics)
+        score += three_score * multiplier
+        breakdown["three_point"] = three_breakdown
+
+        # === FREE THROW ANALYSIS ===
+        # For UNDER: low FT rate is good (fewer points, stops clock less)
+        # For OVER: high FT rate is good (more points)
+        ft_score, ft_breakdown = self._evaluate_free_throws(home_metrics, away_metrics)
+        score += ft_score * multiplier
+        breakdown["free_throw"] = ft_breakdown
+
+        # === TURNOVER ANALYSIS ===
+        # For UNDER: high TO is good (fewer possessions)
+        # For OVER: low TO is good (more possessions)
+        to_score, to_breakdown = self._evaluate_turnovers(home_metrics, away_metrics)
+        score += to_score * multiplier
+        breakdown["turnover"] = to_breakdown
+
+        # === DEFENSE ANALYSIS ===
+        # For UNDER: strong defense is good
+        # For OVER: weak defense is good
+        def_score, def_breakdown = self._evaluate_defense(home_metrics, away_metrics)
+        score += def_score * multiplier
+        breakdown["defense"] = def_breakdown
+
+        # === MATCHUP BONUSES ===
+        # For UNDER: both slow-paced teams, both strong defense
+        # For OVER: both fast-paced teams, both weak defense
+        matchup_score, matchup_breakdown = self._evaluate_matchup(home_metrics, away_metrics)
+        score += matchup_score * multiplier
+        breakdown["matchup"] = matchup_breakdown
+
+        # === PPM/PACE ANALYSIS ===
+        # Different logic for OVER vs UNDER
+        if bet_type == "over":
+            # For OVER: high current PPM is good, low required PPM is good
+            ppm_score = self._evaluate_over_pace(required_ppm, current_ppm)
+        else:
+            # For UNDER: high required PPM is good (need to score fast)
+            ppm_score = self._evaluate_ppm_severity(required_ppm)
+        score += ppm_score
+        breakdown["ppm_severity"] = ppm_score
+
+        # Cap score at 0-100
+        final_score = max(0, min(100, score))
+
+        # Determine unit recommendation
+        unit_recommendation = self._get_unit_recommendation(final_score)
+
+        breakdown["total_score"] = score
+        breakdown["final_score"] = final_score
+
+        return {
+            "confidence": final_score,
+            "unit_recommendation": unit_recommendation,
+            "breakdown": breakdown
+        }
+
+    def _evaluate_pace(self, home: Dict, away: Dict) -> Tuple[float, Dict]:
+        """Evaluate pace/tempo for both teams"""
+        score = 0
+        details = {}
+
+        home_pace = home.get("pace_per_game", home.get("pace", 70))
+        away_pace = away.get("pace_per_game", away.get("pace", 70))
+
+        slow_threshold = self.weights["slow_pace_threshold"]
+        fast_threshold = self.weights["fast_pace_threshold"]
+
+        # Home team pace
+        if home_pace < slow_threshold:
+            score += self.weights["slow_pace_bonus"]
+            details["home"] = f"Slow pace ({home_pace:.1f}): +{self.weights['slow_pace_bonus']}"
+        elif home_pace > fast_threshold:
+            score += self.weights["fast_pace_penalty"]
+            details["home"] = f"Fast pace ({home_pace:.1f}): {self.weights['fast_pace_penalty']}"
+        else:
+            score += self.weights["medium_pace_bonus"]
+            details["home"] = f"Medium pace ({home_pace:.1f}): +{self.weights['medium_pace_bonus']}"
+
+        # Away team pace
+        if away_pace < slow_threshold:
+            score += self.weights["slow_pace_bonus"]
+            details["away"] = f"Slow pace ({away_pace:.1f}): +{self.weights['slow_pace_bonus']}"
+        elif away_pace > fast_threshold:
+            score += self.weights["fast_pace_penalty"]
+            details["away"] = f"Fast pace ({away_pace:.1f}): {self.weights['fast_pace_penalty']}"
+        else:
+            score += self.weights["medium_pace_bonus"]
+            details["away"] = f"Medium pace ({away_pace:.1f}): +{self.weights['medium_pace_bonus']}"
+
+        details["total"] = score
+        return score, details
+
+    def _evaluate_three_point(self, home: Dict, away: Dict) -> Tuple[float, Dict]:
+        """Evaluate 3-point shooting characteristics"""
+        score = 0
+        details = {}
+
+        # Home team
+        home_3p_rate = home.get("three_p_rate", 0.35)
+        home_3p_pct = home.get("three_p_pct", 35) / 100 if home.get("three_p_pct", 35) > 1 else home.get("three_p_pct", 0.35)
+
+        if home_3p_rate < self.weights["low_3p_rate_threshold"]:
+            score += self.weights["low_3p_rate_bonus"]
+            details["home_rate"] = f"Low 3P rate ({home_3p_rate:.2%}): +{self.weights['low_3p_rate_bonus']}"
+
+        if home_3p_pct > self.weights["high_3p_pct_threshold"]:
+            score += self.weights["high_3p_pct_penalty"]
+            details["home_pct"] = f"High 3P% ({home_3p_pct:.1%}): {self.weights['high_3p_pct_penalty']}"
+
+        # Away team
+        away_3p_rate = away.get("three_p_rate", 0.35)
+        away_3p_pct = away.get("three_p_pct", 35) / 100 if away.get("three_p_pct", 35) > 1 else away.get("three_p_pct", 0.35)
+
+        if away_3p_rate < self.weights["low_3p_rate_threshold"]:
+            score += self.weights["low_3p_rate_bonus"]
+            details["away_rate"] = f"Low 3P rate ({away_3p_rate:.2%}): +{self.weights['low_3p_rate_bonus']}"
+
+        if away_3p_pct > self.weights["high_3p_pct_threshold"]:
+            score += self.weights["high_3p_pct_penalty"]
+            details["away_pct"] = f"High 3P% ({away_3p_pct:.1%}): {self.weights['high_3p_pct_penalty']}"
+
+        details["total"] = score
+        return score, details
+
+    def _evaluate_free_throws(self, home: Dict, away: Dict) -> Tuple[float, Dict]:
+        """Evaluate free throw rates"""
+        score = 0
+        details = {}
+
+        home_ft_rate = home.get("ft_rate", 20)
+        away_ft_rate = away.get("ft_rate", 20)
+
+        # Home team
+        if home_ft_rate < self.weights["low_ft_rate_threshold"]:
+            score += self.weights["low_ft_rate_bonus"]
+            details["home"] = f"Low FT rate ({home_ft_rate:.1f}/gm): +{self.weights['low_ft_rate_bonus']}"
+        elif home_ft_rate > self.weights["high_ft_rate_threshold"]:
+            score += self.weights["high_ft_rate_penalty"]
+            details["home"] = f"High FT rate ({home_ft_rate:.1f}/gm): {self.weights['high_ft_rate_penalty']}"
+
+        # Away team
+        if away_ft_rate < self.weights["low_ft_rate_threshold"]:
+            score += self.weights["low_ft_rate_bonus"]
+            details["away"] = f"Low FT rate ({away_ft_rate:.1f}/gm): +{self.weights['low_ft_rate_bonus']}"
+        elif away_ft_rate > self.weights["high_ft_rate_threshold"]:
+            score += self.weights["high_ft_rate_penalty"]
+            details["away"] = f"High FT rate ({away_ft_rate:.1f}/gm): {self.weights['high_ft_rate_penalty']}"
+
+        details["total"] = score
+        return score, details
+
+    def _evaluate_turnovers(self, home: Dict, away: Dict) -> Tuple[float, Dict]:
+        """Evaluate turnover rates (fewer possessions = good for under)"""
+        score = 0
+        details = {}
+
+        home_to_rate = home.get("to_rate", 12)
+        away_to_rate = away.get("to_rate", 12)
+
+        if home_to_rate > self.weights["high_to_rate_threshold"]:
+            score += self.weights["high_to_rate_bonus"]
+            details["home"] = f"High TO rate ({home_to_rate:.1f}/gm): +{self.weights['high_to_rate_bonus']}"
+
+        if away_to_rate > self.weights["high_to_rate_threshold"]:
+            score += self.weights["high_to_rate_bonus"]
+            details["away"] = f"High TO rate ({away_to_rate:.1f}/gm): +{self.weights['high_to_rate_bonus']}"
+
+        details["total"] = score
+        return score, details
+
+    def _evaluate_defense(self, home: Dict, away: Dict) -> Tuple[float, Dict]:
+        """Evaluate defensive efficiency"""
+        score = 0
+        details = {}
+
+        home_def = home.get("def_efficiency", 100)
+        away_def = away.get("def_efficiency", 100)
+
+        if home_def < self.weights["strong_defense_threshold"]:
+            score += self.weights["strong_defense_bonus"]
+            details["home"] = f"Strong defense ({home_def:.1f}): +{self.weights['strong_defense_bonus']}"
+
+        if away_def < self.weights["strong_defense_threshold"]:
+            score += self.weights["strong_defense_bonus"]
+            details["away"] = f"Strong defense ({away_def:.1f}): +{self.weights['strong_defense_bonus']}"
+
+        details["total"] = score
+        return score, details
+
+    def _evaluate_matchup(self, home: Dict, away: Dict) -> Tuple[float, Dict]:
+        """Evaluate matchup-specific factors"""
+        score = 0
+        details = {}
+
+        home_pace = home.get("pace_per_game", home.get("pace", 70))
+        away_pace = away.get("pace_per_game", away.get("pace", 70))
+        home_def = home.get("def_efficiency", 100)
+        away_def = away.get("def_efficiency", 100)
+
+        slow_threshold = self.weights["slow_pace_threshold"]
+        fast_threshold = self.weights["fast_pace_threshold"]
+        strong_def_threshold = self.weights["strong_defense_threshold"]
+
+        # Both teams slow
+        if home_pace < slow_threshold and away_pace < slow_threshold:
+            score += self.weights["both_slow_bonus"]
+            details["both_slow"] = f"+{self.weights['both_slow_bonus']}"
+
+        # Both teams strong defense
+        if home_def < strong_def_threshold and away_def < strong_def_threshold:
+            score += self.weights["both_strong_defense_bonus"]
+            details["both_strong_def"] = f"+{self.weights['both_strong_defense_bonus']}"
+
+        # Pace mismatch (one fast, one slow)
+        if (home_pace < slow_threshold and away_pace > fast_threshold) or \
+           (away_pace < slow_threshold and home_pace > fast_threshold):
+            score += self.weights["pace_mismatch_penalty"]
+            details["pace_mismatch"] = f"{self.weights['pace_mismatch_penalty']}"
+
+        details["total"] = score
+        return score, details
+
+    def _evaluate_ppm_severity(self, required_ppm: float) -> float:
+        """
+        Adjust confidence based on how difficult the required PPM is
+
+        Higher PPM = harder to hit = more confident in under
+        """
+        if required_ppm > 6.0:
+            return 15  # Very difficult pace needed
+        elif required_ppm > 5.5:
+            return 10
+        elif required_ppm > 5.0:
+            return 5
+        elif required_ppm > 4.5:
+            return 0
+        else:
+            return -10  # Easier to hit over
+
+    def _evaluate_over_pace(self, required_ppm: float, current_ppm: float) -> float:
+        """
+        Adjust confidence for OVER bets based on scoring pace
+
+        For OVER:
+        - Low required PPM = they're scoring fast already = good
+        - High current PPM compared to required = good
+        """
+        # Low required PPM is good for OVER
+        if required_ppm < 0.5:
+            score = 15  # Very low, likely to go over
+        elif required_ppm < 1.0:
+            score = 10
+        elif required_ppm < 1.5:
+            score = 5
+        else:
+            score = 0
+
+        # Bonus if current pace is significantly higher than needed
+        if current_ppm > 0 and required_ppm > 0:
+            pace_ratio = current_ppm / required_ppm
+            if pace_ratio > 2.0:
+                score += 10  # Scoring twice as fast as needed
+            elif pace_ratio > 1.5:
+                score += 5
+
+        return score
+
+    def _get_unit_recommendation(self, confidence: float) -> float:
+        """Convert confidence score to unit recommendation"""
+        units = config.UNIT_SIZES
+
+        if units["no_bet"][0] <= confidence <= units["no_bet"][1]:
+            return 0
+        elif units["low"][0] <= confidence <= units["low"][1]:
+            return 0.5
+        elif units["medium"][0] <= confidence <= units["medium"][1]:
+            return 1.0
+        elif units["high"][0] <= confidence <= units["high"][1]:
+            return 2.0
+        elif units["max"][0] <= confidence <= units["max"][1]:
+            return 3.0
+        else:
+            return 0
+
+    def update_weights(self, new_weights: Dict):
+        """Update scoring weights (for admin panel adjustments)"""
+        self.weights.update(new_weights)
+        logger.info(f"Updated confidence scoring weights: {new_weights}")
+
+
+# Singleton instance
+_scorer = None
+
+def get_confidence_scorer() -> ConfidenceScorer:
+    """Get singleton confidence scorer instance"""
+    global _scorer
+    if _scorer is None:
+        _scorer = ConfidenceScorer()
+    return _scorer
