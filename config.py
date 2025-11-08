@@ -102,7 +102,8 @@ CACHE_DIR.mkdir(exist_ok=True)
 # ========== API CONFIGURATION ==========
 # FastAPI settings
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
-API_PORT = int(os.getenv("API_PORT", "8000"))
+# Render provides PORT env var, fallback to API_PORT or 8000
+API_PORT = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
 SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production-please")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
