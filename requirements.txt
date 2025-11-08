@@ -15,6 +15,7 @@ sportsdataverse==0.0.39
 # Data processing
 pandas==2.2.3
 numpy==1.26.4
+xgboost<3.1
 
 # Database
 sqlalchemy==2.0.23
