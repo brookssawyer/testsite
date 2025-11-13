@@ -3,6 +3,7 @@ NCAA Basketball Live Betting Monitor
 Enhanced with intelligent confidence scoring
 """
 import asyncio
+import aiohttp
 import requests
 from datetime import datetime
 from typing import List, Dict, Optional
@@ -433,6 +434,31 @@ class NCAABettingMonitor:
             logger.error(f"Error fetching live games from The Odds API: {e}")
             return []
 
+    async def send_realtime_update(self, game_data: Dict, update_type: str = "game_update"):
+        """
+        Send real-time update to WebSocket clients via API
+
+        Args:
+            game_data: Dictionary containing game information
+            update_type: Type of update (game_update, trigger, alert)
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "http://localhost:8000/api/internal/trigger-update",
+                    json={"game_data": game_data, "update_type": update_type},
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as response:
+                    if response.status == 200:
+                        logger.debug(f"Real-time update sent for game {game_data.get('game_id')}")
+                    else:
+                        logger.warning(f"Real-time update failed: {response.status}")
+        except asyncio.TimeoutError:
+            logger.warning(f"Real-time update timed out for game {game_data.get('game_id')}")
+        except Exception as e:
+            logger.error(f"Error sending real-time update: {e}")
+            # Don't raise - let monitoring continue even if WebSocket update fails
+
     async def analyze_game(self, game: Dict):
         """Analyze a single game for betting opportunities"""
         try:
@@ -598,6 +624,20 @@ class NCAABettingMonitor:
 
             # Log to CSV
             self.csv_logger.log_live_poll(log_data)
+
+            # Send real-time update for triggered games or high confidence
+            if trigger_flag or confidence_score > 40:
+                update_type = "trigger" if trigger_flag else "game_update"
+                await self.send_realtime_update(log_data, update_type)
+
+                # Special alert for exceptional confidence
+                if confidence_score >= 85:
+                    logger.warning("🔥" * 40)
+                    logger.warning(f"⚠️  EXCEPTIONAL CONFIDENCE: {confidence_score:.0f}% ⚠️")
+                    logger.warning(f"Game: {away_team} @ {home_team}")
+                    logger.warning(f"Bet: {bet_type.upper() if bet_type else 'N/A'} | Units: {unit_recommendation}")
+                    logger.warning(f"Required PPM: {required_ppm:.2f} | Current PPM: {current_ppm:.2f}")
+                    logger.warning("🔥" * 40)
 
             # Check if this is a new trigger
             if trigger_flag and game_id not in self.triggered_games:

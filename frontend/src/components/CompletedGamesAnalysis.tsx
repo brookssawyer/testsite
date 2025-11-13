@@ -31,7 +31,7 @@ export default function CompletedGamesAnalysis() {
   const completedGames = completedData?.games || [];
 
   // Get selected game details
-  const selectedGame = completedGames.find(g => g.game_id === selectedGameId);
+  const selectedGame = completedGames.find((g: any) => g.game_id === selectedGameId);
 
   // Transform data for chart
   const chartData = selectedGame?.history?.map((entry: any, index: number) => {

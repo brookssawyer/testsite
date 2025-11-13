@@ -1,12 +1,14 @@
 """
 FastAPI Backend for NCAA Basketball Betting Monitor
 """
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
+import logging
+import asyncio
 import config
 
 from api.auth import (
@@ -25,6 +27,11 @@ from utils.team_stats import get_stats_manager
 from utils.confidence_scorer import get_confidence_scorer
 from utils.csv_logger import get_csv_logger
 from utils.ppm_analyzer import get_ppm_analyzer
+from utils.ai_summary import get_ai_summary_generator
+from api.websocket_manager import manager as ws_manager
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI
 app = FastAPI(
@@ -33,11 +40,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS
+# CORS - Allow all origins for testing
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -83,6 +90,11 @@ class ConfidenceWeightsUpdate(BaseModel):
     weights: Dict
 
 
+class TriggerUpdate(BaseModel):
+    game_data: Dict
+    update_type: str = "game_update"  # game_update, trigger, alert
+
+
 # ========== AUTH ENDPOINTS ==========
 
 @app.post("/api/auth/login", response_model=Token)
@@ -116,6 +128,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 async def get_live_games():  # Auth disabled for testing
     """Get all live games with confidence scores"""
     from datetime import datetime, timedelta
+    import config
 
     csv_logger = get_csv_logger()
 
@@ -142,6 +155,13 @@ async def get_live_games():  # Auth disabled for testing
         try:
             game_time = datetime.fromisoformat(timestamp_str)
             if game_time > cutoff_time:
+                # Filter out games in their last minute if configured
+                if config.FILTER_LAST_MINUTE_GAMES:
+                    total_time_left = float(game.get("Total Time Left") or game.get("total_time_remaining", 999))
+                    if total_time_left <= config.MIN_TIME_REMAINING:
+                        logger.debug(f"Filtering out game in last minute: {game.get('Team 1')} @ {game.get('Team 2')} ({total_time_left:.2f} min remaining)")
+                        continue  # Skip this game
+
                 active_games.append(game)
         except:
             # If timestamp parsing fails, skip this game
@@ -248,6 +268,93 @@ async def get_game_history(game_id: str):  # Auth disabled for testing
         mapped_logs.append(mapped_log)
 
     return {"game_id": game_id, "history": mapped_logs, "count": len(mapped_logs)}
+
+
+@app.post("/api/games/{game_id}/ai-summary")
+async def generate_ai_summary(game_id: str):  # Auth disabled for testing
+    """
+    Generate AI-powered betting summary for a specific game
+
+    Uses OpenAI to analyze game data and team metrics to provide:
+    - Intelligent betting recommendation (BET OVER / BET UNDER / PASS)
+    - Confidence level (1-5 stars)
+    - Concise summary of the game situation
+    - Key factors supporting the recommendation
+    """
+    try:
+        csv_logger = get_csv_logger()
+        stats_manager = get_stats_manager()
+        ai_generator = get_ai_summary_generator()
+
+        # Get latest game data from CSV logs
+        logs = csv_logger.get_recent_logs(limit=1000)
+        game_logs = [log for log in logs if (log.get("Game ID") or log.get("game_id")) == game_id]
+
+        if not game_logs:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No data found for game {game_id}"
+            )
+
+        # Get most recent log entry for this game
+        game_logs.sort(key=lambda x: x.get("Timestamp") or x.get("timestamp", ""), reverse=True)
+        latest_log = game_logs[0]
+
+        # Extract game data
+        home_team = latest_log.get("Team 2") or latest_log.get("home_team")
+        away_team = latest_log.get("Team 1") or latest_log.get("away_team")
+
+        # Build game data dict for AI
+        game_data = {
+            "game_id": game_id,
+            "home_team": home_team,
+            "away_team": away_team,
+            "home_score": int(latest_log.get("Score 2", 0) or 0),
+            "away_score": int(latest_log.get("Score 1", 0) or 0),
+            "total_points": int(latest_log.get("Score 1", 0) or 0) + int(latest_log.get("Score 2", 0) or 0),
+            "period": latest_log.get("Period") or latest_log.get("period", 1),
+            "minutes_remaining": latest_log.get("Mins Remaining") or latest_log.get("minutes_remaining", 20),
+            "ou_line": float(latest_log.get("OU Line", 0) or 0),
+            "required_ppm": float(latest_log.get("Required PPM", 0) or 0),
+            "current_ppm": float(latest_log.get("Current PPM", 0) or 0),
+            "confidence_score": float(latest_log.get("Confidence", 0) or 0),
+            "bet_type": latest_log.get("Bet Type") or latest_log.get("bet_type", "under"),
+        }
+
+        # Get team metrics if available
+        home_metrics = None
+        away_metrics = None
+
+        try:
+            home_metrics = stats_manager.get_team_metrics(home_team)
+            away_metrics = stats_manager.get_team_metrics(away_team)
+        except Exception as e:
+            logger.warning(f"Could not fetch team metrics: {e}")
+
+        # Generate AI summary
+        summary_result = ai_generator.generate_summary(
+            game_data=game_data,
+            home_metrics=home_metrics,
+            away_metrics=away_metrics
+        )
+
+        return {
+            "game_id": game_id,
+            "summary": summary_result.get("summary", ""),
+            "recommendation": summary_result.get("recommendation", "PASS"),
+            "reasoning": summary_result.get("reasoning", ""),
+            "game_data": game_data,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating AI summary for game {game_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate AI summary: {str(e)}"
+        )
 
 
 @app.get("/api/games/completed")
@@ -554,6 +661,149 @@ async def export_results(current_user: User = Depends(get_current_admin_user)):
     )
 
 
+# ========== WEBSOCKET ENDPOINTS ==========
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time game updates
+
+    Connects clients and keeps the connection alive with periodic pings.
+    Clients receive:
+    - connection_established: Welcome message
+    - game_update: Individual game updates
+    - games_update: Full games list updates
+    - alert: High-confidence opportunity alerts
+    - ping: Keep-alive messages
+    """
+    await ws_manager.connect(websocket)
+
+    # Send initial games list to new client
+    try:
+        csv_logger = get_csv_logger()
+        logs = csv_logger.get_recent_logs(limit=1000)
+
+        # Get latest log entry for each unique game_id
+        games_dict = {}
+        for log in reversed(logs):
+            game_id = log.get("Game ID") or log.get("game_id")
+            if game_id and game_id not in games_dict:
+                games_dict[game_id] = log
+
+        games_list = list(games_dict.values())
+
+        # Send games to the newly connected client
+        await ws_manager.send_personal_message(
+            {
+                "type": "games_update",
+                "timestamp": datetime.now().isoformat(),
+                "count": len(games_list),
+                "data": games_list
+            },
+            websocket
+        )
+        logger.info(f"Sent initial {len(games_list)} games to new WebSocket client")
+    except Exception as e:
+        logger.error(f"Error sending initial games: {e}")
+
+    try:
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                # Wait for messages from client (for ping/pong or control messages)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+
+                # Handle client ping
+                if data == "ping":
+                    await ws_manager.send_personal_message(
+                        {"type": "pong", "timestamp": datetime.now().isoformat()},
+                        websocket
+                    )
+
+            except asyncio.TimeoutError:
+                # Send ping to keep connection alive
+                try:
+                    await websocket.send_json({
+                        "type": "ping",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                except:
+                    # Connection likely closed
+                    break
+
+            except WebSocketDisconnect:
+                break
+
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+    finally:
+        ws_manager.disconnect(websocket)
+
+
+@app.post("/api/internal/trigger-update")
+async def internal_trigger_update(update: TriggerUpdate):
+    """
+    Internal endpoint for monitor to send game updates
+
+    This endpoint receives updates from monitor.py and broadcasts them
+    to all connected WebSocket clients.
+
+    Args:
+        update: TriggerUpdate containing game_data and update_type
+
+    update_type can be:
+    - "game_update": Regular game state update
+    - "trigger": PPM threshold exceeded
+    - "alert": High-confidence opportunity (>= 75)
+    """
+    try:
+        game_data = update.game_data
+        confidence = float(game_data.get("confidence_score", 0))
+
+        # Broadcast game update to all connected clients
+        await ws_manager.broadcast_game_update(game_data)
+
+        # Send special alert for high confidence opportunities
+        if confidence >= 75:
+            await ws_manager.send_alert(
+                game_data=game_data,
+                confidence=confidence,
+                alert_type="high_confidence"
+            )
+            logger.info(
+                f"High confidence alert sent: {game_data.get('away_team')} @ "
+                f"{game_data.get('home_team')} ({confidence:.0f}%)"
+            )
+
+        # Send trigger alert if this is a new trigger
+        if update.update_type == "trigger":
+            await ws_manager.send_trigger_alert(game_data)
+            logger.info(
+                f"Trigger alert sent: {game_data.get('away_team')} @ "
+                f"{game_data.get('home_team')} (PPM: {game_data.get('required_ppm')})"
+            )
+
+        return {
+            "status": "success",
+            "message": "Update broadcast to connected clients",
+            "active_connections": len(ws_manager.active_connections),
+            "confidence": confidence
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing trigger update: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process update: {str(e)}"
+        )
+
+
+@app.get("/api/websocket/stats")
+async def websocket_stats():
+    """Get WebSocket connection statistics"""
+    return ws_manager.get_stats()
+
+
 # ========== HEALTH CHECK ==========
 
 @app.get("/health")
@@ -562,7 +812,8 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "websocket_connections": len(ws_manager.active_connections)
     }
 
 

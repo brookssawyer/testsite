@@ -1,0 +1,994 @@
+================================================================================
+NCAA BASKETBALL LIVE BETTING MONITOR - PROJECT SUMMARY
+================================================================================
+Last Updated: 2025-11-11
+Project Type: Real-time Sports Betting Intelligence Dashboard
+Status: Active Development
+
+================================================================================
+DEPLOYMENT INFORMATION
+================================================================================
+
+PRODUCTION (VERCEL):
+  URL: https://frontend-h6om6lxim-brookssawyers-projects.vercel.app/
+  Platform: Vercel (Auto-deploy from GitHub)
+  Status: Pending deployment of latest features (requires git push)
+
+LOCAL DEVELOPMENT:
+  Frontend: http://localhost:3002
+  Backend API: http://localhost:8000
+  Monitor: Running in background (polls every 30 seconds)
+
+================================================================================
+PROJECT OVERVIEW
+================================================================================
+
+An intelligent, real-time NCAA basketball betting monitoring system that:
+
+1. LIVE DATA POLLING
+   - Polls The Odds API every 30 seconds for live game data
+   - Tracks 20+ live games simultaneously
+   - Monitors real-time scores, betting lines, and game state
+
+2. INTELLIGENT BETTING ANALYSIS
+   - Calculates required Points Per Minute (PPM) to hit over/under lines
+   - Triggers alerts when PPM threshold > 4.5 (high-confidence UNDER opportunities)
+   - Confidence scoring algorithm (0-100) based on team statistics
+   - Unit sizing recommendations (0.5 to 3 units) based on confidence tiers
+
+3. ADVANCED TEAM ANALYTICS
+   - Integrates KenPom (premium) or ESPN (free) team statistics
+   - Tracks pace, defensive efficiency, 3-point shooting rates
+   - Matchup analysis for both teams
+   - Historical performance tracking
+
+4. REAL-TIME DASHBOARD
+   - Live game cards with color-coded confidence indicators
+   - Filtering by confidence tiers and PPM ranges
+   - Click-through game detail modals with trend charts
+   - Performance analytics and ROI tracking
+
+5. DATA PERSISTENCE
+   - CSV-based logging for portability
+   - Live poll logs (every 30-second update)
+   - Game results and outcome tracking
+   - Performance metrics by confidence tier
+
+================================================================================
+TECH STACK
+================================================================================
+
+BACKEND:
+  - Python 3.10+
+  - FastAPI (REST API framework)
+  - Uvicorn (ASGI server)
+  - Pandas (data processing)
+  - Axios (HTTP client)
+
+DATA SOURCES:
+  - The Odds API (live scores + betting odds)
+  - KenPom via kenpompy (premium team stats) OR
+  - ESPN via sportsdataverse-py (free alternative)
+
+FRONTEND:
+  - Next.js 14 (React framework with App Router)
+  - TypeScript
+  - TailwindCSS (utility-first styling)
+  - SWR (data fetching with auto-refresh)
+  - Recharts v2.15.4 (data visualization)
+  - Axios (API client)
+  - clsx (conditional class names)
+
+STORAGE:
+  - CSV files for logs and results
+  - JSON for user management
+  - File-based caching for team stats
+
+DEPLOYMENT:
+  - Railway (backend API + monitor)
+  - Vercel (frontend)
+  - GitHub (version control, auto-deploy trigger)
+
+================================================================================
+ARCHITECTURE & DATA FLOW
+================================================================================
+
+1. MONITOR PROCESS (monitor.py) - Runs 24/7
+   ├─ Polls The Odds API every 30 seconds
+   ├─ Fetches team stats from KenPom/ESPN (cached 24 hours)
+   ├─ Extracts over/under lines from bookmakers
+   ├─ Calculates required PPM to hit O/U
+   ├─ Triggers when PPM > 4.5
+   ├─ Calculates confidence score using team metrics
+   └─ Logs to CSV (ncaa_live_log.csv)
+
+2. API SERVER (api/main.py) - FastAPI REST API
+   ├─ Serves live game data from CSV logs
+   ├─ Provides game history for trend analysis
+   ├─ Performance analytics endpoints
+   ├─ Admin endpoints (user management, config)
+   └─ CORS enabled for Vercel frontend
+
+3. FRONTEND (Next.js App)
+   ├─ Polls backend API every 20 seconds (SWR)
+   ├─ Renders live game cards with filtering
+   ├─ Game detail modals with 4 trend charts
+   ├─ Admin panel for system management
+   └─ Responsive design for mobile/desktop
+
+4. DATA PERSISTENCE
+   ├─ ncaa_live_log.csv (every poll logged)
+   ├─ ncaa_results.csv (final game outcomes)
+   ├─ cache/*.csv (team stats cache)
+   ├─ data/users.json (user authentication)
+   └─ logs/monitor.log (application logs)
+
+================================================================================
+RECENT FEATURES IMPLEMENTED (THIS SESSION)
+================================================================================
+
+FEATURE 1: PPM FLASHING ANIMATION
+  Purpose: Visual indicator for high-urgency UNDER bet opportunities
+  Behavior: When Required PPM > 4.5, the card section pulses green
+
+  File Modified: /frontend/src/components/GameCard.tsx
+  Lines Changed: 155-169
+
+  Technical Implementation:
+    - Used Tailwind's animate-pulse for smooth animation
+    - Conditional background: bg-green-500/20
+    - Conditional border: border-2 border-green-500/50
+    - Text color changes to text-green-300 when triggered
+    - No custom CSS required
+
+  Code Change:
+    OLD: Simple gray background for all PPM displays
+    NEW: Dynamic styling based on requiredPpm > 4.5 condition
+
+  Impact: Immediately draws attention to high-confidence UNDER opportunities
+
+
+FEATURE 2: PPM RANGE FILTERING
+  Purpose: Allow users to filter games by Required PPM and Current PPM ranges
+  Behavior: Dual range sliders filter games in real-time
+
+  Files Modified: /frontend/src/app/page.tsx
+
+  State Added (Lines 17-20):
+    - minRequiredPpm: number (default 0)
+    - maxRequiredPpm: number (default 10)
+    - minCurrentPpm: number (default 0)
+    - maxCurrentPpm: number (default 10)
+
+  Filtering Logic (Lines 42-54):
+    - Client-side filtering before sorting
+    - Required PPM filter applied to all games
+    - Current PPM filter only applied when current_ppm > 0
+    - Maintains existing confidence/time sorting
+
+  UI Controls (Lines 194-255):
+    - Number inputs with step=0.5
+    - Min/max range for both Required and Current PPM
+    - Reset button to clear all filters
+    - Responsive layout with gap-4 spacing
+
+  Impact: Users can focus on specific PPM ranges for their betting strategy
+
+
+FEATURE 3: GAME DETAIL MODAL WITH TREND CHARTS
+  Purpose: Click any game card to view detailed trend analysis
+  Behavior: Full-screen modal displays 4 interactive charts for selected game
+
+  New File Created: /frontend/src/components/GameDetailModal.tsx (61 lines)
+
+  Modal Features:
+    - Full-screen overlay with backdrop blur
+    - Click-outside-to-close functionality
+    - Escape key to close
+    - Body scroll prevention when open
+    - Responsive width (max-w-7xl)
+    - Max height 90vh with scrolling
+    - Sticky header with game title
+
+  Charts Displayed (via embedded TrendsView):
+    1. Total Score Progression (line chart)
+    2. Over/Under Line Movement (step chart)
+    3. Scoring Pace - Required PPM vs Current PPM (dual line chart)
+    4. Confidence Score Progression (line chart with tier reference lines)
+    5. Historical Data Table (all polls for the game)
+
+  File Modified: /frontend/src/components/TrendsView.tsx
+  Changes (Lines 18-24):
+    - Made liveGames optional (liveGames?: any[])
+    - Added preSelectedGameId prop
+    - Added hideSelector prop to hide game dropdown
+    - Uses latest history entry for game info when liveGames unavailable
+
+  File Modified: /frontend/src/app/page.tsx
+  Changes:
+    - Line 10: Import GameDetailModal
+    - Line 21: State for selectedGameForModal
+    - Lines 300-305: Pass onClick handler to GameCard
+    - Lines 375-382: Render modal when game selected
+
+  Impact: Users can deep-dive into any game's trends without leaving main view
+
+
+FILE 4: LOCAL DEVELOPMENT ENVIRONMENT FIX
+  Problem: Frontend couldn't fetch games from API
+  Root Cause: Frontend configured with old ngrok URL instead of localhost
+
+  File Modified: /frontend/.env.local
+
+  Change:
+    OLD: NEXT_PUBLIC_API_URL=https://e03e73508869.ngrok-free.app
+    NEW: NEXT_PUBLIC_API_URL=http://localhost:8000
+
+  Actions Taken:
+    1. Updated .env.local file
+    2. Killed processes on port 3002
+    3. Restarted Next.js dev server
+    4. Confirmed .env.local loaded successfully
+
+  Resolution: Browser hard refresh (Cmd+Shift+R) required to pick up changes
+
+================================================================================
+FILE STRUCTURE
+================================================================================
+
+/basketball-betting/
+├── api/
+│   ├── main.py                 # FastAPI server (all endpoints)
+│   └── auth.py                 # JWT authentication
+│
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx        # Main dashboard (MODIFIED)
+│   │   │   ├── admin/          # Admin panel
+│   │   │   └── login/          # Login page
+│   │   │
+│   │   ├── components/
+│   │   │   ├── GameCard.tsx              # Game card component (MODIFIED)
+│   │   │   ├── GameDetailModal.tsx       # Modal for game details (NEW)
+│   │   │   ├── TrendsView.tsx            # Trend charts (MODIFIED)
+│   │   │   ├── CompletedGamesAnalysis.tsx
+│   │   │   └── AllGamesComparison.tsx
+│   │   │
+│   │   └── lib/
+│   │       └── api.ts          # API client functions
+│   │
+│   ├── .env.local              # Environment config (MODIFIED)
+│   ├── package.json
+│   └── tailwind.config.js
+│
+├── utils/
+│   ├── team_stats.py           # Unified stats manager
+│   ├── team_stats_kenpom.py    # KenPom integration
+│   ├── team_stats_espn.py      # ESPN integration
+│   ├── confidence_scorer.py    # Confidence algorithm
+│   └── csv_logger.py           # CSV logging utilities
+│
+├── data/
+│   ├── ncaa_live_log.csv       # Live poll logs
+│   ├── ncaa_results.csv        # Final game results
+│   └── users.json              # User accounts
+│
+├── cache/
+│   └── team_stats_*.csv        # Cached team statistics
+│
+├── monitor.py                  # Main polling script
+├── config.py                   # Configuration settings
+├── requirements.txt            # Python dependencies
+├── CLAUDE.md                   # AI assistant guidance
+└── PROJECT_SUMMARY.txt         # This file
+
+================================================================================
+API ENDPOINTS
+================================================================================
+
+PUBLIC ENDPOINTS (No Auth):
+  GET  /health
+       Returns: {"status": "healthy"}
+
+  GET  /api/games/live
+       Returns: {"games": [...]} - All live games with latest metrics
+
+  GET  /api/games/triggered
+       Returns: {"games": [...]} - Only triggered games (confidence > 40)
+
+  GET  /api/games/{game_id}/history
+       Returns: {"history": [...]} - All polls for specific game
+
+  GET  /api/games/completed?limit=20
+       Returns: {"games": [...]} - Completed games with outcomes
+
+  GET  /api/stats/performance
+       Returns: Performance metrics (win rate, ROI, by tier)
+
+  GET  /api/stats/results?limit=50
+       Returns: Game results history
+
+ADMIN ENDPOINTS (Auth Required):
+  GET  /api/admin/users
+  POST /api/admin/users
+  DELETE /api/admin/users/{username}
+  GET  /api/admin/config
+  POST /api/admin/config/weights
+  GET  /api/admin/system/status
+  GET  /api/export/live-log
+  GET  /api/export/results
+
+================================================================================
+DATA MODELS
+================================================================================
+
+GAME OBJECT (Live):
+{
+  "game_id": "401817488",
+  "home_team": "Virginia Cavaliers",
+  "away_team": "Hampton Pirates",
+  "home_score": "42",
+  "away_score": "19",
+  "total_points": 61,
+  "period": "1",
+  "minutes_remaining": "0",
+  "seconds_remaining": "35",
+  "ou_line": "142.5",                    // Live over/under line
+  "espn_closing_total": "148.5",         // Closing line from ESPN
+  "required_ppm": "3.96",                // PPM needed to hit O/U
+  "current_ppm": "3.14",                 // Current scoring pace
+  "ppm_difference": "-0.82",             // Difference (current - required)
+  "projected_final_score": "125.7",     // Projected total at current pace
+  "total_time_remaining": "20.6",        // Minutes left in game
+  "bet_type": "UNDER",                   // Recommended bet (over/under)
+  "trigger_flag": true,                  // Whether alert triggered
+  "confidence_score": "85",              // 0-100 confidence score
+  "unit_size": "2.0",                    // Recommended unit size
+  "home_pace": "68.5",                   // Team stat: possessions per game
+  "away_pace": "71.2",
+  "home_def_eff": "95.3",                // Points allowed per 100 possessions
+  "away_def_eff": "98.7",
+  "home_3p_rate": "0.38",                // 3-point attempt rate
+  "away_3p_rate": "0.42",
+  "timestamp": "2025-11-11T21:01:52.777016"
+}
+
+CONFIDENCE TIERS:
+  86-100: MAX     (3 units, green badge)
+  76-85:  HIGH    (2 units, green badge)
+  61-75:  MEDIUM  (1 unit, yellow badge)
+  41-60:  LOW     (0.5 units, red badge)
+  0-40:   NO BET  (0 units, gray)
+
+================================================================================
+CONFIDENCE SCORING ALGORITHM
+================================================================================
+
+Base Score: 50 (when trigger met, i.e., PPM > 4.5)
+
+FACTORS EVALUATED:
+
+1. PACE ANALYSIS (Weight: 15 points)
+   - For UNDER bets: Slower pace = higher confidence
+   - Evaluates both team's pace relative to league average
+   - Matchup bonus if both teams play slow
+
+2. 3-POINT SHOOTING (Weight: 10 points)
+   - For UNDER bets: Lower 3P attempt rate = higher confidence
+   - High-volume 3-point teams increase scoring volatility
+   - Evaluates both teams' 3P rates
+
+3. DEFENSIVE EFFICIENCY (Weight: 15 points)
+   - Strong defense (low points allowed) = higher confidence
+   - Evaluates both team's defensive metrics
+   - Matchup bonus if both teams have strong defense
+
+4. FREE THROW RATE (Weight: 5 points)
+   - Lower FT rate = fewer stoppages = more predictable scoring
+
+5. TURNOVER RATE (Weight: 5 points)
+   - High turnovers = fewer possessions = lower scoring
+
+6. PPM SEVERITY ADJUSTMENT (Weight: Up to 10 points)
+   - The higher the required PPM above 4.5, the more confident
+   - Example: PPM of 6.0 gets maximum severity bonus
+
+7. MATCHUP BONUSES (Weight: Variable)
+   - Both slow teams: +5 points
+   - Both strong defense: +5 points
+   - Both low 3P volume: +3 points
+
+FINAL SCORE: Capped at 0-100
+
+================================================================================
+CONFIGURATION
+================================================================================
+
+Key Settings (config.py):
+
+POLLING:
+  POLL_INTERVAL = 30 seconds
+  PPM_THRESHOLD = 4.5 (trigger point for UNDER bets)
+
+DATA SOURCE:
+  USE_KENPOM = True/False (toggle between KenPom and ESPN)
+  STATS_REFRESH_HOURS = 24 (team stats cache duration)
+
+CONFIDENCE WEIGHTS:
+  All weights adjustable via admin panel
+  Changes applied in real-time without restart
+
+UNIT SIZING:
+  Confidence 86+: 3 units (MAX)
+  Confidence 76-85: 2 units (HIGH)
+  Confidence 61-75: 1 unit (MEDIUM)
+  Confidence 41-60: 0.5 units (LOW)
+  Confidence <41: 0 units (NO BET)
+
+FILE PATHS:
+  LIVE_LOG = "data/ncaa_live_log.csv"
+  RESULTS_LOG = "data/ncaa_results.csv"
+  CACHE_DIR = "cache/"
+
+================================================================================
+CURRENT STATUS
+================================================================================
+
+WORKING:
+  ✓ Backend API running on localhost:8000
+  ✓ Monitor polling live games every 30 seconds
+  ✓ Frontend running on localhost:3002
+  ✓ Live game data fetching and display
+  ✓ PPM flashing animation (green when > 4.5)
+  ✓ PPM range filtering (Required and Current)
+  ✓ Game detail modal with trend charts
+  ✓ Confidence scoring and unit recommendations
+  ✓ Performance analytics tracking
+
+PENDING:
+  ⚠ Git push to GitHub (required for Vercel deployment)
+  ⚠ Browser hard refresh needed to see latest changes
+  ⚠ Vercel deployment of new features (PPM flash, filters, modal)
+
+KNOWN ISSUES:
+  - Browser cache holds old JavaScript bundle with ngrok URL
+  - Must hard refresh (Cmd+Shift+R) after env changes
+  - Git HTTPS authentication not configured (manual push required)
+
+================================================================================
+DEPLOYMENT WORKFLOW
+================================================================================
+
+CURRENT SETUP:
+1. Code changes made locally
+2. Git commit created (frontend changes only)
+3. Manual git push required to GitHub
+4. Vercel auto-deploys from GitHub main branch
+
+TO DEPLOY NEW FEATURES:
+1. Run from terminal:
+   cd /Users/brookssawyer/Desktop/basketball-betting
+   git push origin master
+
+2. Vercel will automatically:
+   - Detect GitHub push
+   - Build Next.js app with new .env variables
+   - Deploy to production URL
+   - Update https://frontend-h6om6lxim-brookssawyers-projects.vercel.app/
+
+3. Production environment variables needed on Vercel:
+   NEXT_PUBLIC_API_URL=<Railway backend URL>
+
+================================================================================
+DETAILED FILE CHANGES (THIS SESSION)
+================================================================================
+
+FILE: /frontend/src/components/GameCard.tsx
+LINES: 155-169
+PURPOSE: Add green flashing animation when Required PPM > 4.5
+
+OLD CODE:
+--------
+<div className="bg-gray-900/50 rounded p-2">
+  <div className="text-xs text-gray-400">Required PPM</div>
+  <div className={clsx('text-lg font-bold',
+    betType === 'over' ? 'text-green-400' : 'text-blue-400'
+  )}>
+    {(requiredPpm ?? 0).toFixed(2)}
+  </div>
+</div>
+
+NEW CODE:
+--------
+<div className={clsx(
+  'rounded p-2 transition-all',
+  requiredPpm > 4.5
+    ? 'bg-green-500/20 animate-pulse border-2 border-green-500/50'
+    : 'bg-gray-900/50'
+)}>
+  <div className="text-xs text-gray-400">Required PPM</div>
+  <div className={clsx('text-lg font-bold',
+    requiredPpm > 4.5
+      ? 'text-green-300'
+      : (betType === 'over' ? 'text-green-400' : 'text-blue-400')
+  )}>
+    {(requiredPpm ?? 0).toFixed(2)}
+  </div>
+</div>
+
+
+FILE: /frontend/src/app/page.tsx
+LINES: 17-20 (State Addition)
+PURPOSE: Add state for PPM filtering
+
+NEW CODE:
+--------
+const [minRequiredPpm, setMinRequiredPpm] = useState<number>(0);
+const [maxRequiredPpm, setMaxRequiredPpm] = useState<number>(10);
+const [minCurrentPpm, setMinCurrentPpm] = useState<number>(0);
+const [maxCurrentPpm, setMaxCurrentPpm] = useState<number>(10);
+
+
+FILE: /frontend/src/app/page.tsx
+LINES: 42-54 (Filtering Logic)
+PURPOSE: Filter games by PPM ranges before sorting
+
+NEW CODE:
+--------
+const sortedGames = [...liveGames]
+  .filter((game) => {
+    const reqPpm = parseFloat(game.required_ppm || 0);
+    const curPpm = parseFloat(game.current_ppm || 0);
+
+    // Apply Required PPM filters
+    if (reqPpm < minRequiredPpm || reqPpm > maxRequiredPpm) return false;
+
+    // Apply Current PPM filters (only if current_ppm exists)
+    if (curPpm > 0 && (curPpm < minCurrentPpm || curPpm > maxCurrentPpm)) return false;
+
+    return true;
+  })
+  .sort((a, b) => {
+    if (sortBy === 'confidence') {
+      return parseFloat(b.confidence_score || 0) - parseFloat(a.confidence_score || 0);
+    }
+    return (b.timestamp || '').localeCompare(a.timestamp || '');
+  });
+
+
+FILE: /frontend/src/app/page.tsx
+LINES: 194-255 (UI Controls)
+PURPOSE: Add PPM filter inputs and reset button
+
+NEW CODE:
+--------
+{/* PPM Filters */}
+<div className="flex gap-4 items-center">
+  <div className="flex gap-2 items-center">
+    <span className="text-sm text-gray-400">Required PPM:</span>
+    <input
+      type="number"
+      value={minRequiredPpm}
+      onChange={(e) => setMinRequiredPpm(parseFloat(e.target.value) || 0)}
+      step="0.5"
+      min="0"
+      max="10"
+      className="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+      placeholder="Min"
+    />
+    <span className="text-gray-500">-</span>
+    <input
+      type="number"
+      value={maxRequiredPpm}
+      onChange={(e) => setMaxRequiredPpm(parseFloat(e.target.value) || 10)}
+      step="0.5"
+      min="0"
+      max="10"
+      className="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+      placeholder="Max"
+    />
+  </div>
+
+  <div className="flex gap-2 items-center">
+    <span className="text-sm text-gray-400">Current PPM:</span>
+    <input
+      type="number"
+      value={minCurrentPpm}
+      onChange={(e) => setMinCurrentPpm(parseFloat(e.target.value) || 0)}
+      step="0.5"
+      min="0"
+      max="10"
+      className="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+      placeholder="Min"
+    />
+    <span className="text-gray-500">-</span>
+    <input
+      type="number"
+      value={maxCurrentPpm}
+      onChange={(e) => setMaxCurrentPpm(parseFloat(e.target.value) || 10)}
+      step="0.5"
+      min="0"
+      max="10"
+      className="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+      placeholder="Max"
+    />
+  </div>
+
+  <button
+    onClick={() => {
+      setMinRequiredPpm(0);
+      setMaxRequiredPpm(10);
+      setMinCurrentPpm(0);
+      setMaxCurrentPpm(10);
+    }}
+    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-medium text-gray-300"
+  >
+    Reset Filters
+  </button>
+</div>
+
+
+FILE: /frontend/src/app/page.tsx
+LINES: 10, 21, 300-305, 375-382 (Modal Integration)
+PURPOSE: Add game detail modal functionality
+
+NEW CODE (Line 10):
+--------
+import GameDetailModal from '@/components/GameDetailModal';
+
+NEW CODE (Line 21):
+--------
+const [selectedGameForModal, setSelectedGameForModal] = useState<any>(null);
+
+NEW CODE (Lines 300-305):
+--------
+{sortedGames.map((game, idx) => (
+  <GameCard
+    key={`${game.game_id}-${idx}`}
+    game={game}
+    onClick={() => setSelectedGameForModal(game)}
+  />
+))}
+
+NEW CODE (Lines 375-382):
+--------
+{/* Game Detail Modal */}
+{selectedGameForModal && (
+  <GameDetailModal
+    gameId={selectedGameForModal.game_id}
+    gameTitle={`${selectedGameForModal.away_team} @ ${selectedGameForModal.home_team}`}
+    onClose={() => setSelectedGameForModal(null)}
+  />
+)}
+
+
+FILE: /frontend/src/components/GameDetailModal.tsx (NEW FILE - 61 lines)
+PURPOSE: Modal component for displaying game trend charts
+
+FULL CODE:
+--------
+'use client';
+
+import React from 'react';
+import TrendsView from './TrendsView';
+
+interface GameDetailModalProps {
+  gameId: string;
+  gameTitle?: string;
+  onClose: () => void;
+}
+
+export default function GameDetailModal({ gameId, gameTitle, onClose }: GameDetailModalProps) {
+  // Close on Escape key
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-800 rounded-lg shadow-2xl border-2 border-gray-700 w-full max-w-7xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center z-10">
+          <h2 className="text-xl font-bold text-white">
+            {gameTitle || 'Game Details'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-colors text-2xl font-bold px-3 py-1 hover:bg-gray-700 rounded"
+            aria-label="Close modal"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <TrendsView preSelectedGameId={gameId} hideSelector={true} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+FILE: /frontend/src/components/TrendsView.tsx
+LINES: 18-24 (Props Interface)
+PURPOSE: Make component work in modal context
+
+OLD CODE:
+--------
+interface TrendsViewProps {
+  liveGames: any[];
+}
+
+export default function TrendsView({ liveGames }: TrendsViewProps) {
+  const [selectedGameId, setSelectedGameId] = useState<string>('');
+
+NEW CODE:
+--------
+interface TrendsViewProps {
+  liveGames?: any[];
+  preSelectedGameId?: string;
+  hideSelector?: boolean;
+}
+
+export default function TrendsView({ liveGames = [], preSelectedGameId, hideSelector = false }: TrendsViewProps) {
+  const [selectedGameId, setSelectedGameId] = useState<string>(preSelectedGameId || '');
+
+
+FILE: /frontend/src/components/TrendsView.tsx
+LINES: 63-68 (Fallback Game Info)
+PURPOSE: Show game info even when liveGames not provided
+
+NEW CODE:
+--------
+// Get selected game details
+const selectedGame = liveGames.find(g => g.game_id === selectedGameId);
+
+// If no selectedGame from liveGames, use latest history entry for game info
+const latestHistoryEntry = gameHistory.length > 0 ? gameHistory[gameHistory.length - 1] : null;
+const gameInfo = selectedGame || latestHistoryEntry;
+
+
+FILE: /frontend/src/components/TrendsView.tsx
+LINES: 73-91 (Conditional Selector)
+PURPOSE: Hide game dropdown when used in modal
+
+NEW CODE:
+--------
+{/* Game Selector */}
+{!hideSelector && (
+  <div className="bg-gray-800 rounded-lg p-6">
+    <label className="block text-sm font-medium text-gray-300 mb-2">
+      Select Game to Analyze
+    </label>
+    <select
+      value={selectedGameId}
+      onChange={(e) => setSelectedGameId(e.target.value)}
+      className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">-- Choose a game --</option>
+      {liveGames.map((game) => (
+        <option key={game.game_id} value={game.game_id}>
+          {game.away_team} @ {game.home_team} - {game.period ? `Q${game.period}` : 'Pending'}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
+
+
+FILE: /frontend/.env.local
+PURPOSE: Fix local development API connection
+
+OLD CODE:
+--------
+NEXT_PUBLIC_API_URL=https://e03e73508869.ngrok-free.app
+
+NEW CODE:
+--------
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+================================================================================
+TROUBLESHOOTING STEPS TAKEN
+================================================================================
+
+ISSUE: No games showing on localhost:3002
+
+INVESTIGATION:
+1. Checked monitor.py logs
+   Result: Monitor collecting data (20+ games)
+
+2. Tested API endpoint directly
+   Command: curl http://localhost:8000/api/games/live
+   Result: API returning games successfully
+
+3. Checked frontend environment config
+   Command: cat frontend/.env.local
+   Result: Found old ngrok URL instead of localhost
+
+RESOLUTION:
+1. Updated frontend/.env.local to use http://localhost:8000
+2. Killed processes on port 3002
+3. Restarted Next.js dev server
+4. Confirmed .env.local loaded
+5. Instructed user to hard refresh browser (Cmd+Shift+R)
+
+ROOT CAUSE:
+- Environment variable gets baked into JavaScript bundle at build time
+- Browser was caching old bundle with ngrok URL
+- Hard refresh required to fetch new bundle with localhost URL
+
+================================================================================
+AREAS FOR IMPROVEMENT
+================================================================================
+
+PERFORMANCE OPTIMIZATIONS:
+1. Implement WebSocket for true real-time updates (vs. polling)
+2. Add database (PostgreSQL) for better query performance at scale
+3. Implement Redis caching for frequently accessed data
+4. Optimize CSV parsing for large log files
+
+FEATURE ENHANCEMENTS:
+1. SMS/Discord/Email alerts for high-confidence triggers
+2. Mobile app (React Native)
+3. Player injury data integration
+4. Weather data for outdoor sports
+5. Live odds comparison across multiple sportsbooks
+6. Bet slip tracking and outcome recording
+7. Machine learning to optimize confidence weights
+8. In-game momentum indicators
+
+USER EXPERIENCE:
+1. Dark/light mode toggle
+2. Customizable alert thresholds
+3. Saved filter presets
+4. Game watchlist functionality
+5. Sound notifications for triggers
+6. Export game analysis to PDF
+
+ANALYTICS & REPORTING:
+1. Daily/weekly performance reports
+2. Betting streak tracking
+3. Best performing times/teams analysis
+4. Confidence calibration charts (actual vs predicted)
+5. Bankroll management tools
+
+DATA INTEGRATIONS:
+1. More sportsbooks for odds comparison
+2. Advanced stats (synergy, play-by-play)
+3. Referee tendencies
+4. Home/away splits
+5. Rest days impact analysis
+
+TECHNICAL IMPROVEMENTS:
+1. Unit tests and integration tests
+2. CI/CD pipeline automation
+3. Error tracking (Sentry)
+4. Performance monitoring (Datadog)
+5. API rate limiting and caching
+6. Automated backup system
+7. Horizontal scaling for monitor
+
+SECURITY ENHANCEMENTS:
+1. OAuth2 authentication
+2. API key management
+3. Role-based access control (RBAC)
+4. Audit logs for admin actions
+5. Rate limiting per user
+6. HTTPS enforcement
+
+================================================================================
+DEPENDENCIES
+================================================================================
+
+PYTHON (requirements.txt):
+- fastapi
+- uvicorn
+- pandas
+- requests
+- python-dotenv
+- kenpompy (optional, for KenPom integration)
+- sportsdataverse (optional, for ESPN integration)
+
+JAVASCRIPT (package.json):
+- next@14.0.4
+- react@18.2.0
+- typescript@5.3.3
+- tailwindcss@3.4.0
+- swr@2.2.4
+- axios@1.6.2
+- recharts@2.15.4
+- clsx@2.0.0
+
+================================================================================
+ENVIRONMENT VARIABLES
+================================================================================
+
+BACKEND (.env):
+  ODDS_API_KEY=<your-odds-api-key>
+  USE_KENPOM=false
+  KENPOM_EMAIL=<optional>
+  KENPOM_PASSWORD=<optional>
+  SECRET_KEY=<jwt-secret>
+  ENVIRONMENT=development
+
+FRONTEND (.env.local):
+  NEXT_PUBLIC_API_URL=http://localhost:8000
+
+PRODUCTION (Vercel):
+  NEXT_PUBLIC_API_URL=<Railway backend URL>
+
+PRODUCTION (Railway):
+  All backend .env variables
+  + BACKEND_URL=https://<your-app>.railway.app
+
+================================================================================
+GIT COMMIT HISTORY (THIS SESSION)
+================================================================================
+
+Commit created but not pushed:
+  Files staged:
+    - frontend/src/components/GameCard.tsx
+    - frontend/src/app/page.tsx
+    - frontend/src/components/GameDetailModal.tsx (new)
+    - frontend/src/components/TrendsView.tsx
+
+  Commit message:
+    "Add PPM flashing animation, PPM filters, and game detail modal
+
+    - GameCard: Green pulse animation when Required PPM > 4.5
+    - Dashboard: PPM range filters (Required and Current)
+    - New GameDetailModal component with trend charts
+    - TrendsView: Support for modal integration with preSelectedGameId
+
+    Generated with Claude Code
+    Co-Authored-By: Claude <noreply@anthropic.com>"
+
+PENDING ACTION:
+  Manual git push required to deploy to Vercel
+  Command: cd /Users/brookssawyer/Desktop/basketball-betting && git push origin master
+
+================================================================================
+CONTACT & SUPPORT
+================================================================================
+
+This is a custom-built application. For questions or improvements:
+
+1. Review CLAUDE.md for development guidelines
+2. Check logs/monitor.log for runtime errors
+3. Verify CSV files in data/ for data issues
+4. Review Railway/Vercel deployment logs for production issues
+
+Common Issues:
+- API not returning data: Check ODDS_API_KEY in .env
+- Team stats missing: Verify KenPom credentials or ESPN integration
+- Frontend not updating: Check NEXT_PUBLIC_API_URL and clear browser cache
+- Confidence scores = 0: Verify team stats are loaded
+
+================================================================================
+END OF PROJECT SUMMARY
+================================================================================
+
+Last updated: 2025-11-11
+Generated by: Claude Code
+Version: NCAA Betting Monitor v2.0

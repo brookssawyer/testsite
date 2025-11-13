@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'NCAA Basketball Betting Monitor',
-  description: 'Real-time NCAA basketball betting intelligence platform',
+  description: 'Real-time NCAA basketball betting intelligence platform - Public Beta',
 }
 
 export default function RootLayout({

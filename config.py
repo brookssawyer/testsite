@@ -26,7 +26,11 @@ ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 SPORT_MODE = os.getenv("SPORT_MODE", "ncaa").lower()
 
 # Polling interval in seconds
-POLL_INTERVAL = 40  # 40 seconds
+POLL_INTERVAL = 15  # 15 seconds - faster refresh for ESPN and Odds API
+
+# Game filtering settings
+FILTER_LAST_MINUTE_GAMES = True  # Hide games with ≤1 minute remaining from the site
+MIN_TIME_REMAINING = 1.0  # Minimum minutes remaining to display a game
 
 # PPM thresholds for triggering alerts
 PPM_THRESHOLD_UNDER = 4.5   # Trigger UNDER when required PPM is HIGH (need to score fast)
@@ -109,7 +113,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # CORS settings
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:3002").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") != "*" else ["*"]
 
 # ========== LOGGING CONFIGURATION ==========
 LOG_DIR = BASE_DIR / "logs"

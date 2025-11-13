@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { games, stats } from '@/lib/api';
+import { stats } from '@/lib/api';
 import GameCard from '@/components/GameCard';
 import TrendsView from '@/components/TrendsView';
 import CompletedGamesAnalysis from '@/components/CompletedGamesAnalysis';
 import AllGamesComparison from '@/components/AllGamesComparison';
+import GameDetailModal from '@/components/GameDetailModal';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import clsx from 'clsx';
 
 export default function Dashboard() {
@@ -17,30 +19,55 @@ export default function Dashboard() {
   const [maxRequiredPpm, setMaxRequiredPpm] = useState<number>(10);
   const [minCurrentPpm, setMinCurrentPpm] = useState<number>(0);
   const [maxCurrentPpm, setMaxCurrentPpm] = useState<number>(10);
+  const [selectedGameForModal, setSelectedGameForModal] = useState<any>(null);
+  const [flashAlert, setFlashAlert] = useState(false);
 
-  // Poll every 20 seconds
-  const { data: gamesData, error, mutate } = useSWR(
-    filter === 'all' ? 'games-live' : 'games-triggered',
-    filter === 'all' ? games.getLive : games.getTriggered,
-    { refreshInterval: 20000 }
-  );
+  // WebSocket connection for real-time game updates
+  const {
+    games: wsGames,
+    isConnected,
+    lastUpdate,
+    connectionCount,
+    error: wsError,
+    reconnect
+  } = useWebSocket();
 
   const { data: perfData } = useSWR('performance', stats.getPerformance, {
     refreshInterval: 60000,
   });
 
-  // Version marker for deployment tracking
+  // Request notification permission on mount
   useEffect(() => {
-    console.log('NCAA Betting Monitor v2.0 - Public Access - No Authentication');
+    console.log('NCAA Betting Monitor v3.0 - Real-time WebSocket Edition');
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          console.log('Browser notifications enabled');
+        }
+      });
+    }
   }, []);
 
-  const liveGames = gamesData?.games || [];
+  // Flash effect when high-confidence games arrive
+  useEffect(() => {
+    const hasHighConfidence = wsGames.some(game =>
+      game.confidence_score >= 75 && game.trigger_flag
+    );
+
+    if (hasHighConfidence) {
+      setFlashAlert(true);
+      setTimeout(() => setFlashAlert(false), 1000);
+    }
+  }, [wsGames]);
+
+  const liveGames = wsGames || [];
 
   // Filter and sort games
   const sortedGames = [...liveGames]
     .filter((game) => {
-      const reqPpm = parseFloat(game.required_ppm || 0);
-      const curPpm = parseFloat(game.current_ppm || 0);
+      const reqPpm = parseFloat(game.required_ppm || '0');
+      const curPpm = parseFloat(game.current_ppm || '0');
 
       // Apply Required PPM filters
       if (reqPpm < minRequiredPpm || reqPpm > maxRequiredPpm) return false;
@@ -52,13 +79,40 @@ export default function Dashboard() {
     })
     .sort((a, b) => {
       if (sortBy === 'confidence') {
-        return parseFloat(b.confidence_score || 0) - parseFloat(a.confidence_score || 0);
+        return parseFloat(b.confidence_score || '0') - parseFloat(a.confidence_score || '0');
       }
       return (b.timestamp || '').localeCompare(a.timestamp || '');
     });
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className={clsx('min-h-screen bg-gray-900 transition-all duration-300', flashAlert && 'ring-4 ring-yellow-500')}>
+      {/* WebSocket Connection Status Bar */}
+      <div className={clsx(
+        'w-full py-2 px-4 text-center text-sm font-semibold transition-all duration-300',
+        isConnected
+          ? 'bg-green-600 text-white'
+          : 'bg-red-600 text-white'
+      )}>
+        {isConnected ? (
+          <div className="flex items-center justify-center gap-2">
+            <span className="inline-block w-2 h-2 bg-white rounded-full animate-pulse"></span>
+            <span>LIVE - {connectionCount} connection{connectionCount !== 1 ? 's' : ''}</span>
+            {lastUpdate && <span className="text-xs opacity-80">• Last update: {lastUpdate.toLocaleTimeString()}</span>}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <span className="inline-block w-2 h-2 bg-white rounded-full"></span>
+            <span>DISCONNECTED</span>
+            <button
+              onClick={reconnect}
+              className="ml-2 px-3 py-1 bg-white text-red-600 rounded text-xs font-bold hover:bg-gray-100"
+            >
+              Reconnect
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -268,34 +322,60 @@ export default function Dashboard() {
                 {filter === 'triggered' ? 'Active Opportunities' : 'Live Games'} ({liveGames.length})
               </h2>
 
-              <button
-                onClick={() => mutate()}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-medium"
-              >
-                Refresh
-              </button>
+              <div className="flex gap-3 items-center">
+                {lastUpdate && (
+                  <span className="text-sm text-gray-400">
+                    Updated {lastUpdate.toLocaleTimeString()}
+                  </span>
+                )}
+                <button
+                  onClick={reconnect}
+                  disabled={isConnected}
+                  className={clsx(
+                    'px-4 py-2 rounded text-sm font-medium transition-colors',
+                    isConnected
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white'
+                  )}
+                >
+                  {isConnected ? 'Connected' : 'Reconnect'}
+                </button>
+              </div>
             </div>
 
-            {/* Games Grid */}
-            {error && (
-              <div className="bg-red-900/20 border border-red-500 rounded p-4 text-red-400">
-                Error loading games. Please try again.
+            {/* WebSocket Error */}
+            {wsError && (
+              <div className="mb-4 bg-red-900/20 border border-red-500 rounded p-4 text-red-400">
+                <p className="font-semibold">WebSocket Error</p>
+                <p className="text-sm mt-1">{wsError}</p>
+                <button
+                  onClick={reconnect}
+                  className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-xs font-medium"
+                >
+                  Try Reconnecting
+                </button>
               </div>
             )}
 
-            {!error && liveGames.length === 0 && (
+            {!wsError && liveGames.length === 0 && (
               <div className="bg-gray-800 rounded-lg p-12 text-center">
                 <p className="text-gray-400 text-lg">
-                  {filter === 'triggered'
+                  {!isConnected
+                    ? 'Connecting to real-time updates...'
+                    : filter === 'triggered'
                     ? 'No triggered games at the moment. Check back soon!'
-                    : 'No live games right now.'}
+                    : 'No live games right now. Waiting for games to start...'}
                 </p>
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {sortedGames.map((game, idx) => (
-                <GameCard key={`${game.game_id}-${idx}`} game={game} />
+                <GameCard
+                  key={`${game.game_id}-${idx}`}
+                  game={game}
+                  onClick={() => setSelectedGameForModal(game)}
+                />
               ))}
             </div>
           </>
@@ -365,6 +445,15 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* Game Detail Modal */}
+      {selectedGameForModal && (
+        <GameDetailModal
+          gameId={selectedGameForModal.game_id}
+          gameTitle={`${selectedGameForModal.away_team} @ ${selectedGameForModal.home_team}`}
+          onClose={() => setSelectedGameForModal(null)}
+        />
+      )}
     </div>
   );
 }

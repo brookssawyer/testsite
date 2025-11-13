@@ -16,11 +16,13 @@ import {
 } from 'recharts';
 
 interface TrendsViewProps {
-  liveGames: any[];
+  liveGames?: any[];
+  preSelectedGameId?: string;
+  hideSelector?: boolean;
 }
 
-export default function TrendsView({ liveGames }: TrendsViewProps) {
-  const [selectedGameId, setSelectedGameId] = useState<string>('');
+export default function TrendsView({ liveGames = [], preSelectedGameId, hideSelector = false }: TrendsViewProps) {
+  const [selectedGameId, setSelectedGameId] = useState<string>(preSelectedGameId || '');
 
   // Fetch game history when a game is selected
   const { data: historyData, error } = useSWR(
@@ -61,52 +63,58 @@ export default function TrendsView({ liveGames }: TrendsViewProps) {
   // Get selected game details
   const selectedGame = liveGames.find(g => g.game_id === selectedGameId);
 
+  // If no selectedGame from liveGames, use latest history entry for game info
+  const latestHistoryEntry = gameHistory.length > 0 ? gameHistory[gameHistory.length - 1] : null;
+  const gameInfo = selectedGame || latestHistoryEntry;
+
   return (
     <div className="space-y-6">
       {/* Game Selector */}
-      <div className="bg-gray-800 rounded-lg p-6">
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Select Game to Analyze
-        </label>
-        <select
-          value={selectedGameId}
-          onChange={(e) => setSelectedGameId(e.target.value)}
-          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">-- Choose a game --</option>
-          {liveGames.map((game) => (
-            <option key={game.game_id} value={game.game_id}>
-              {game.away_team} @ {game.home_team} - {game.period ? `Q${game.period}` : 'Pending'}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!hideSelector && (
+        <div className="bg-gray-800 rounded-lg p-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Select Game to Analyze
+          </label>
+          <select
+            value={selectedGameId}
+            onChange={(e) => setSelectedGameId(e.target.value)}
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Choose a game --</option>
+            {liveGames.map((game) => (
+              <option key={game.game_id} value={game.game_id}>
+                {game.away_team} @ {game.home_team} - {game.period ? `Q${game.period}` : 'Pending'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Charts */}
-      {selectedGameId && selectedGame && (
+      {selectedGameId && gameInfo && (
         <>
           {/* Game Info */}
           <div className="bg-gray-800 rounded-lg p-6">
             <h3 className="text-xl font-bold mb-2">
-              {selectedGame.away_team} @ {selectedGame.home_team}
+              {gameInfo.away_team} @ {gameInfo.home_team}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <span className="text-gray-400">Score:</span>
-                <span className="ml-2 font-bold">{selectedGame.away_score} - {selectedGame.home_score}</span>
+                <span className="ml-2 font-bold">{gameInfo.away_score} - {gameInfo.home_score}</span>
               </div>
               <div>
                 <span className="text-gray-400">Total:</span>
-                <span className="ml-2 font-bold">{selectedGame.total_points}</span>
+                <span className="ml-2 font-bold">{gameInfo.total_points}</span>
               </div>
               <div>
                 <span className="text-gray-400">O/U Line:</span>
-                <span className="ml-2 font-bold">{selectedGame.ou_line}</span>
+                <span className="ml-2 font-bold">{gameInfo.ou_line}</span>
               </div>
               <div>
                 <span className="text-gray-400">Current Bet:</span>
-                <span className={`ml-2 font-bold ${selectedGame.bet_type === 'over' ? 'text-green-400' : 'text-blue-400'}`}>
-                  {selectedGame.bet_type?.toUpperCase() || 'UNDER'}
+                <span className={`ml-2 font-bold ${gameInfo.bet_type === 'over' ? 'text-green-400' : 'text-blue-400'}`}>
+                  {gameInfo.bet_type?.toUpperCase() || 'UNDER'}
                 </span>
               </div>
             </div>
@@ -315,9 +323,9 @@ export default function TrendsView({ liveGames }: TrendsViewProps) {
                       <td className="py-2 px-2">{row.time}</td>
                       <td className="text-right py-2 px-2 font-bold">{row.totalPoints}</td>
                       <td className="text-right py-2 px-2 text-yellow-400">{row.ouLine}</td>
-                      <td className="text-right py-2 px-2">{row.requiredPpm.toFixed(2)}</td>
-                      <td className="text-right py-2 px-2 text-purple-400">{row.currentPpm.toFixed(2)}</td>
-                      <td className="text-right py-2 px-2 font-bold text-cyan-400">{row.confidenceScore.toFixed(0)}</td>
+                      <td className="text-right py-2 px-2">{(row.requiredPpm ?? 0).toFixed(2)}</td>
+                      <td className="text-right py-2 px-2 text-purple-400">{(row.currentPpm ?? 0).toFixed(2)}</td>
+                      <td className="text-right py-2 px-2 font-bold text-cyan-400">{(row.confidenceScore ?? 0).toFixed(0)}</td>
                       <td className={`py-2 px-2 font-bold ${row.betType === 'over' ? 'text-green-400' : 'text-blue-400'}`}>
                         {row.betType.toUpperCase()}
                       </td>
