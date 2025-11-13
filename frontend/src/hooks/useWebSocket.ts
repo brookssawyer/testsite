@@ -185,7 +185,21 @@ function playAlertSound(alertLevel: string) {
 // WebSocket Hook
 // ============================================================================
 
-export function useWebSocket(wsUrl: string = 'ws://localhost:8000/ws'): UseWebSocketReturn {
+/**
+ * Get WebSocket URL from environment variable or default to localhost
+ */
+function getWebSocketUrl(): string {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  // Convert HTTP URL to WebSocket URL
+  const wsUrl = apiUrl
+    .replace('http://', 'ws://')
+    .replace('https://', 'wss://');
+
+  return `${wsUrl}/ws`;
+}
+
+export function useWebSocket(wsUrl: string = getWebSocketUrl()): UseWebSocketReturn {
   const [games, setGames] = useState<GameData[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
