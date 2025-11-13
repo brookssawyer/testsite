@@ -67,8 +67,8 @@ export default function Dashboard() {
   // Filter and sort games
   const sortedGames = [...liveGames]
     .filter((game) => {
-      const reqPpm = parseFloat(game.required_ppm || '0');
-      const curPpm = parseFloat(game.current_ppm || '0');
+      const reqPpm = typeof game.required_ppm === 'number' ? game.required_ppm : parseFloat(game.required_ppm || '0');
+      const curPpm = typeof game.current_ppm === 'number' ? game.current_ppm : parseFloat(game.current_ppm || '0');
 
       // Apply Required PPM filters
       if (reqPpm < minRequiredPpm || reqPpm > maxRequiredPpm) return false;
@@ -83,19 +83,23 @@ export default function Dashboard() {
 
       switch (sortBy) {
         case 'confidence':
-          comparison = parseFloat(b.confidence_score || '0') - parseFloat(a.confidence_score || '0');
+          comparison = (typeof b.confidence_score === 'number' ? b.confidence_score : parseFloat(b.confidence_score || '0')) -
+                      (typeof a.confidence_score === 'number' ? a.confidence_score : parseFloat(a.confidence_score || '0'));
           break;
         case 'time':
           comparison = (b.timestamp || '').localeCompare(a.timestamp || '');
           break;
         case 'required_ppm':
-          comparison = parseFloat(b.required_ppm || '0') - parseFloat(a.required_ppm || '0');
+          comparison = (typeof b.required_ppm === 'number' ? b.required_ppm : parseFloat(b.required_ppm || '0')) -
+                      (typeof a.required_ppm === 'number' ? a.required_ppm : parseFloat(a.required_ppm || '0'));
           break;
         case 'current_ppm':
-          comparison = parseFloat(b.current_ppm || '0') - parseFloat(a.current_ppm || '0');
+          comparison = (typeof b.current_ppm === 'number' ? b.current_ppm : parseFloat(b.current_ppm || '0')) -
+                      (typeof a.current_ppm === 'number' ? a.current_ppm : parseFloat(a.current_ppm || '0'));
           break;
         case 'ppm_difference':
-          comparison = parseFloat(b.ppm_difference || '0') - parseFloat(a.ppm_difference || '0');
+          comparison = (typeof b.ppm_difference === 'number' ? b.ppm_difference : parseFloat(b.ppm_difference || '0')) -
+                      (typeof a.ppm_difference === 'number' ? a.ppm_difference : parseFloat(a.ppm_difference || '0'));
           break;
         default:
           comparison = 0;
