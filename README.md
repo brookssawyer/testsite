@@ -126,29 +126,25 @@ npm run dev
 
 ## Deployment
 
-### Backend (Railway)
+**For complete deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)**
 
-1. Create new project on Railway
-2. Connect GitHub repository
-3. Set environment variables:
-   ```
-   USE_KENPOM=true
-   KENPOM_EMAIL=your-email
-   KENPOM_PASSWORD=your-password
-   ODDS_API_KEY=your-key
-   ENVIRONMENT=production
-   SECRET_KEY=generate-random-secret
-   ```
-4. Deploy automatically runs both API and monitor
+### Quick Deployment Overview
 
-### Frontend (Vercel)
+**Backend (Railway):**
+- Deploy from GitHub repo
+- Runs both API server and monitor worker
+- Set environment variables (see DEPLOYMENT.md)
 
-1. Import project from GitHub
-2. Set environment variable:
-   ```
-   NEXT_PUBLIC_API_URL=https://your-app.railway.app
-   ```
-3. Deploy
+**Frontend (Vercel):**
+- Deploy from GitHub repo (set root to `frontend/`)
+- Set `NEXT_PUBLIC_API_URL` to Railway backend URL
+
+**Custom Domain:**
+- Add domain to Vercel
+- Configure DNS records at registrar
+- SSL auto-provisioned by Vercel
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for step-by-step instructions, environment variables, DNS configuration, troubleshooting, and more.
 
 ## Usage
 
