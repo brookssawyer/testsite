@@ -34,6 +34,7 @@ class CSVLogger:
                 "Secs Remaining",
                 "Status",
                 "OU Line",
+                "Sportsbook",
                 "ESPN Closing Total",
                 "Required PPM",
                 "Current PPM",
@@ -46,11 +47,25 @@ class CSVLogger:
                 "Confidence",
                 "Units",
                 "Home Pace",
-                "Home 3P Rate",
+                "Home Off Eff",
                 "Home Def Eff",
+                "Home AdjEM",
+                "Home SOS",
+                "Home KenPom Rank",
+                "Home eFG%",         # NEW
+                "Home TS%",          # NEW
+                "Home 2P%",          # NEW
+                "Home Eff Margin",   # NEW
                 "Away Pace",
-                "Away 3P Rate",
+                "Away Off Eff",
                 "Away Def Eff",
+                "Away AdjEM",
+                "Away SOS",
+                "Away KenPom Rank",
+                "Away eFG%",         # NEW
+                "Away TS%",          # NEW
+                "Away 2P%",          # NEW
+                "Away Eff Margin",   # NEW
                 "Timestamp",
                 "Game ID"
             ]
@@ -123,6 +138,7 @@ class CSVLogger:
                 game_data.get("seconds_remaining"),   # Secs Remaining
                 status,                                # Status
                 game_data.get("ou_line"),             # OU Line
+                game_data.get("sportsbook", ""),      # Sportsbook
                 game_data.get("espn_closing_total", ""),  # ESPN Closing Total
                 round(game_data.get("required_ppm", 0), 2),      # Required PPM
                 round(game_data.get("current_ppm", 0), 2),       # Current PPM
@@ -135,11 +151,25 @@ class CSVLogger:
                 round(game_data.get("confidence_score", 0), 1),  # Confidence
                 game_data.get("unit_size", 0),                   # Units
                 game_data.get("home_metrics", {}).get("pace_per_game", ""),     # Home Pace
-                game_data.get("home_metrics", {}).get("three_p_rate", ""),      # Home 3P Rate
+                game_data.get("home_metrics", {}).get("off_efficiency", ""),    # Home Off Eff
                 game_data.get("home_metrics", {}).get("def_efficiency", ""),    # Home Def Eff
+                game_data.get("home_metrics", {}).get("adj_em", ""),            # Home AdjEM
+                game_data.get("home_metrics", {}).get("sos", ""),               # Home SOS
+                game_data.get("home_metrics", {}).get("kenpom_rank", ""),       # Home KenPom Rank
+                game_data.get("home_metrics", {}).get("efg_pct", ""),           # Home eFG% (NEW)
+                game_data.get("home_metrics", {}).get("ts_pct", ""),            # Home TS% (NEW)
+                game_data.get("home_metrics", {}).get("two_p_pct", ""),         # Home 2P% (NEW)
+                game_data.get("home_metrics", {}).get("efficiency_margin", ""), # Home Eff Margin (NEW)
                 game_data.get("away_metrics", {}).get("pace_per_game", ""),     # Away Pace
-                game_data.get("away_metrics", {}).get("three_p_rate", ""),      # Away 3P Rate
+                game_data.get("away_metrics", {}).get("off_efficiency", ""),    # Away Off Eff
                 game_data.get("away_metrics", {}).get("def_efficiency", ""),    # Away Def Eff
+                game_data.get("away_metrics", {}).get("adj_em", ""),            # Away AdjEM
+                game_data.get("away_metrics", {}).get("sos", ""),               # Away SOS
+                game_data.get("away_metrics", {}).get("kenpom_rank", ""),       # Away KenPom Rank
+                game_data.get("away_metrics", {}).get("efg_pct", ""),           # Away eFG% (NEW)
+                game_data.get("away_metrics", {}).get("ts_pct", ""),            # Away TS% (NEW)
+                game_data.get("away_metrics", {}).get("two_p_pct", ""),         # Away 2P% (NEW)
+                game_data.get("away_metrics", {}).get("efficiency_margin", ""), # Away Eff Margin (NEW)
                 game_data.get("timestamp", datetime.now().isoformat()),         # Timestamp
                 game_data.get("game_id")                                        # Game ID
             ]

@@ -503,9 +503,30 @@ class NCAABettingMonitor:
                 else:
                     total_time_remaining = 40
 
-            # Get O/U line from bookmakers (use consensus or first available)
+            # Get O/U line from bookmakers (use default or first available)
             ou_line = self._get_totals_line(game)
             ou_open = ou_line  # The Odds API doesn't provide opening lines in free tier
+
+            # Get all available bookmaker lines for frontend display
+            all_bookmaker_lines = self._get_all_bookmaker_lines(game)
+
+            # Determine which bookmaker was actually used
+            sportsbook_used = config.DEFAULT_SPORTSBOOK
+            bookmakers = game.get("bookmakers", [])
+            for bookmaker in bookmakers:
+                if bookmaker.get("key") == config.DEFAULT_SPORTSBOOK:
+                    markets = bookmaker.get("markets", [])
+                    for market in markets:
+                        if market.get("key") == "totals":
+                            sportsbook_used = bookmaker.get("title", config.DEFAULT_SPORTSBOOK)
+                            break
+                    break
+
+            # If default not found, find which one was actually used
+            if sportsbook_used == config.DEFAULT_SPORTSBOOK and all_bookmaker_lines:
+                # Use the first available bookmaker
+                first_book = list(all_bookmaker_lines.values())[0]
+                sportsbook_used = first_book.get("title", "Unknown")
 
             if not ou_line:
                 logger.debug(f"No O/U line for {home_team} vs {away_team}")
@@ -605,6 +626,8 @@ class NCAABettingMonitor:
                 "away_score": away_score,
                 "total_points": total_points,
                 "ou_line": ou_line,
+                "sportsbook": sportsbook_used,
+                "all_bookmaker_lines": all_bookmaker_lines,
                 "ou_open": ou_open,
                 "espn_closing_total": espn_closing_total,
                 "required_ppm": round(required_ppm, 2),
@@ -690,21 +713,54 @@ class NCAABettingMonitor:
 
         # TODO: Add alert integrations (SMS, Discord, email, etc.)
 
-    def _get_totals_line(self, game: Dict) -> Optional[float]:
-        """Extract over/under totals line from bookmakers data"""
+    def _get_totals_line(self, game: Dict, preferred_book: str = None) -> Optional[float]:
+        """
+        Extract over/under totals line from bookmakers data
+
+        Args:
+            game: Game data with bookmakers list
+            preferred_book: Preferred bookmaker key (e.g., "fanduel", "draftkings")
+
+        Returns:
+            O/U line from preferred bookmaker, or first available
+        """
         try:
             bookmakers = game.get("bookmakers", [])
             if not bookmakers:
                 return None
 
-            # Try to find totals market from first available bookmaker
+            # Use default from config if not specified
+            if preferred_book is None:
+                preferred_book = config.DEFAULT_SPORTSBOOK
+
+            # Try to find preferred bookmaker first
+            for bookmaker in bookmakers:
+                if bookmaker.get("key") == preferred_book:
+                    markets = bookmaker.get("markets", [])
+                    for market in markets:
+                        if market.get("key") == "totals":
+                            outcomes = market.get("outcomes", [])
+                            if outcomes:
+                                return float(outcomes[0].get("point", 0))
+
+            # Fallback: Try supported bookmakers in priority order
+            for book_key in config.SUPPORTED_SPORTSBOOKS:
+                for bookmaker in bookmakers:
+                    if bookmaker.get("key") == book_key:
+                        markets = bookmaker.get("markets", [])
+                        for market in markets:
+                            if market.get("key") == "totals":
+                                outcomes = market.get("outcomes", [])
+                                if outcomes:
+                                    return float(outcomes[0].get("point", 0))
+
+            # Last resort: Use first available bookmaker
             for bookmaker in bookmakers:
                 markets = bookmaker.get("markets", [])
                 for market in markets:
                     if market.get("key") == "totals":
                         outcomes = market.get("outcomes", [])
                         if outcomes:
-                            # Return the point value (over/under line)
                             return float(outcomes[0].get("point", 0))
 
             return None
@@ -712,6 +768,44 @@ class NCAABettingMonitor:
         except Exception as e:
             logger.error(f"Error extracting totals line: {e}")
             return None
+
+    def _get_all_bookmaker_lines(self, game: Dict) -> Dict[str, float]:
+        """
+        Extract O/U lines from all available bookmakers
+
+        Returns:
+            Dict mapping bookmaker key to O/U line
+            Example: {"fanduel": 145.5, "draftkings": 146.0, "betmgm": 145.5}
+        """
+        try:
+            bookmakers = game.get("bookmakers", [])
+            if not bookmakers:
+                return {}
+
+            all_lines = {}
+
+            for bookmaker in bookmakers:
+                book_key = bookmaker.get("key")
+                book_title = bookmaker.get("title")
+                markets = bookmaker.get("markets", [])
+
+                for market in markets:
+                    if market.get("key") == "totals":
+                        outcomes = market.get("outcomes", [])
+                        if outcomes:
+                            line = float(outcomes[0].get("point", 0))
+                            all_lines[book_key] = {
+                                "line": line,
+                                "title": book_title,
+                                "key": book_key
+                            }
+                            break
+
+            return all_lines
+
+        except Exception as e:
+            logger.error(f"Error extracting all bookmaker lines: {e}")
+            return {}
 
     def _update_game_state(self, game: Dict, log_data: Dict, confidence_data: Dict):
         """Update tracking for game state (for end-of-game logging)"""

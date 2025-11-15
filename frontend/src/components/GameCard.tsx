@@ -104,11 +104,32 @@ export default function GameCard({ game, onClick }: GameCardProps) {
           {game.away_score} - {game.home_score}
         </div>
         <div className="text-right">
-          <div className="text-sm text-gray-400">O/U Line (Live)</div>
+          <div className="text-sm text-gray-400">
+            O/U Line {game.sportsbook && <span className="text-xs">({game.sportsbook})</span>}
+          </div>
           <div className="text-xl font-bold">{game.ou_line}</div>
           {espnClosingTotal > 0 && (
             <div className="text-xs text-gray-500 mt-1">
               Close: {espnClosingTotal}
+            </div>
+          )}
+          {game.ou_position && (
+            <div className={clsx(
+              'text-xs font-semibold mt-1 px-2 py-0.5 rounded inline-block',
+              game.ou_position === 'PEAK' ? 'bg-orange-500/20 text-orange-400' :
+              game.ou_position === 'VALLEY' ? 'bg-cyan-500/20 text-cyan-400' :
+              game.ou_position === 'STABLE' ? 'bg-gray-500/20 text-gray-400' :
+              'bg-gray-600/20 text-gray-500'
+            )}>
+              {game.ou_position === 'PEAK' ? '📈 PEAK' :
+               game.ou_position === 'VALLEY' ? '📉 VALLEY' :
+               game.ou_position === 'STABLE' ? '→ STABLE' :
+               '— NEUTRAL'}
+            </div>
+          )}
+          {game.ou_peak && game.ou_valley && (
+            <div className="text-xs text-gray-500 mt-0.5">
+              Range: {game.ou_valley} - {game.ou_peak}
             </div>
           )}
         </div>
@@ -209,26 +230,81 @@ export default function GameCard({ game, onClick }: GameCardProps) {
         )}
       </div>
 
-      {/* Team Stats Preview */}
+      {/* Team Stats Preview - KenPom Data */}
       {triggered && (
-        <div className="border-t border-gray-700 pt-2 mt-2">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-gray-400">Home Pace:</span>{' '}
-              <span className="font-semibold">{parseFloat(game.home_pace || 0).toFixed(1)}</span>
+        <div className="border-t border-gray-700 pt-3 mt-2">
+          <div className="text-xs text-gray-400 font-semibold mb-2">KenPom Team Stats</div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            {/* Rankings */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">Rank</div>
+              <div className="font-semibold text-yellow-400">#{game.home_kenpom_rank || 'N/A'}</div>
+              <div className="font-semibold text-blue-400 mt-1">#{game.away_kenpom_rank || 'N/A'}</div>
             </div>
-            <div>
-              <span className="text-gray-400">Away Pace:</span>{' '}
-              <span className="font-semibold">{parseFloat(game.away_pace || 0).toFixed(1)}</span>
+            {/* Pace */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">Pace</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_pace || 0).toFixed(1)}</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_pace || 0).toFixed(1)}</div>
             </div>
-            <div>
-              <span className="text-gray-400">Home Def:</span>{' '}
-              <span className="font-semibold">{parseFloat(game.home_def_eff || 0).toFixed(1)}</span>
+            {/* Offensive Efficiency */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">Off Eff</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_off_eff || 0).toFixed(1)}</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_off_eff || 0).toFixed(1)}</div>
             </div>
-            <div>
-              <span className="text-gray-400">Away Def:</span>{' '}
-              <span className="font-semibold">{parseFloat(game.away_def_eff || 0).toFixed(1)}</span>
+            {/* Defensive Efficiency */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">Def Eff</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_def_eff || 0).toFixed(1)}</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_def_eff || 0).toFixed(1)}</div>
             </div>
+            {/* AdjEM */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">AdjEM</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_adj_em || 0).toFixed(1)}</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_adj_em || 0).toFixed(1)}</div>
+            </div>
+            {/* SOS */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">SOS</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_sos || 0).toFixed(2)}</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_sos || 0).toFixed(2)}</div>
+            </div>
+          </div>
+
+          {/* ESPN Advanced Metrics Row */}
+          <div className="text-xs text-gray-400 font-semibold mb-2 mt-3 border-t border-gray-700 pt-2">ESPN Advanced Metrics</div>
+          <div className="grid grid-cols-4 gap-2 text-xs">
+            {/* eFG% */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">eFG%</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_efg_pct || 0).toFixed(1)}%</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_efg_pct || 0).toFixed(1)}%</div>
+            </div>
+            {/* TS% */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">TS%</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_ts_pct || 0).toFixed(1)}%</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_ts_pct || 0).toFixed(1)}%</div>
+            </div>
+            {/* 2P% */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">2P%</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_2p_pct || 0).toFixed(1)}%</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_2p_pct || 0).toFixed(1)}%</div>
+            </div>
+            {/* Efficiency Margin */}
+            <div className="bg-gray-800/50 rounded p-2">
+              <div className="text-gray-500 text-[10px] mb-1">Eff Margin</div>
+              <div className="font-semibold text-yellow-400">{parseFloat(game.home_eff_margin || 0).toFixed(1)}</div>
+              <div className="font-semibold text-blue-400 mt-1">{parseFloat(game.away_eff_margin || 0).toFixed(1)}</div>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-gray-500 mt-2 flex justify-between">
+            <span className="text-yellow-400">■ Home</span>
+            <span className="text-blue-400">■ Away</span>
           </div>
         </div>
       )}

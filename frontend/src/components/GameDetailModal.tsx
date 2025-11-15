@@ -16,10 +16,28 @@ interface AISummary {
   timestamp: string;
 }
 
+interface HistoricalDataPoint {
+  timestamp: string;
+  period: number;
+  minutes_remaining: number;
+  seconds_remaining: number;
+  total_points: number;
+  away_score: number;
+  home_score: number;
+  ou_line: number;
+  required_ppm: number;
+  current_ppm?: number;
+  projected_final_score?: number;
+  ppm_difference?: number;
+}
+
 export default function GameDetailModal({ gameId, gameTitle, onClose }: GameDetailModalProps) {
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // Close on Escape key
   useEffect(() => {
@@ -37,6 +55,37 @@ export default function GameDetailModal({ gameId, gameTitle, onClose }: GameDeta
       document.body.style.overflow = 'unset';
     };
   }, []);
+
+  // Fetch Historical Data on mount
+  useEffect(() => {
+    const fetchHistoricalData = async () => {
+      setLoadingHistory(true);
+      setHistoryError(null);
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${apiUrl}/api/games/${gameId}/history`, {
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch historical data: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setHistoricalData(data.history || []);
+      } catch (error) {
+        console.error('Error fetching historical data:', error);
+        setHistoryError(error instanceof Error ? error.message : 'Failed to fetch historical data');
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    fetchHistoricalData();
+  }, [gameId]);
 
   // Fetch AI Summary
   const fetchAISummary = async () => {
@@ -149,6 +198,114 @@ export default function GameDetailModal({ gameId, gameTitle, onClose }: GameDeta
                 </svg>
                 <p className="text-lg">Click Generate Summary to get AI-powered betting analysis</p>
                 <p className="text-sm mt-2">Analyzes game state, team metrics, and betting situation to provide intelligent recommendations</p>
+              </div>
+            )}
+          </div>
+
+          {/* Historical Data Section */}
+          <div className="bg-gray-900 rounded-lg p-6 border border-gray-700">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+              <svg className="w-6 h-6 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Game History Timeline
+            </h3>
+
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-12">
+                <svg className="animate-spin h-10 w-10 text-blue-400" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            ) : historyError ? (
+              <div className="bg-red-900/50 border border-red-700 rounded-lg p-4 text-red-200">
+                <p className="font-medium">Error loading historical data</p>
+                <p className="text-sm mt-1">{historyError}</p>
+              </div>
+            ) : historicalData.length === 0 ? (
+              <div className="text-gray-400 text-center py-8">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-lg">No historical data available for this game yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {historicalData.map((point, index) => {
+                  const isFirst = index === 0;
+                  const isLast = index === historicalData.length - 1;
+                  const totalTime = point.minutes_remaining || 0;
+                  const totalScore = point.total_points || 0;
+                  const isOverLine = totalScore > (point.ou_line || 0);
+
+                  return (
+                    <div
+                      key={index}
+                      className={`relative pl-8 pb-4 ${!isLast ? 'border-l-2 border-gray-700' : ''}`}
+                    >
+                      {/* Timeline dot */}
+                      <div className={`absolute left-0 top-0 w-4 h-4 rounded-full border-2 ${
+                        isFirst ? 'bg-green-500 border-green-400' :
+                        isLast ? 'bg-red-500 border-red-400' :
+                        'bg-gray-600 border-gray-500'
+                      }`} />
+
+                      {/* Data point card */}
+                      <div className="bg-gray-800 rounded-lg p-3 ml-4 border border-gray-700">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="text-xs text-gray-400">
+                              Period {point.period} • {point.minutes_remaining}:{String(point.seconds_remaining || 0).padStart(2, '0')} remaining
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(point.timestamp).toLocaleTimeString()}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-bold text-white">
+                              {point.away_score} - {point.home_score}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              Total: {totalScore}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <div className="bg-gray-900/50 rounded p-2">
+                            <div className="text-xs text-gray-400">O/U Line</div>
+                            <div className="text-sm font-semibold text-gray-300">{point.ou_line}</div>
+                          </div>
+                          <div className={`rounded p-2 ${isOverLine ? 'bg-green-500/20' : 'bg-blue-500/20'}`}>
+                            <div className="text-xs text-gray-400">Status</div>
+                            <div className={`text-sm font-semibold ${isOverLine ? 'text-green-400' : 'text-blue-400'}`}>
+                              {isOverLine ? 'Over' : 'Under'} by {Math.abs(totalScore - (point.ou_line || 0)).toFixed(1)}
+                            </div>
+                          </div>
+                          {point.required_ppm && (
+                            <div className="bg-gray-900/50 rounded p-2">
+                              <div className="text-xs text-gray-400">Required PPM</div>
+                              <div className="text-sm font-semibold text-gray-300">{parseFloat(point.required_ppm).toFixed(2)}</div>
+                            </div>
+                          )}
+                          {point.current_ppm && point.current_ppm > 0 && (
+                            <div className="bg-gray-900/50 rounded p-2">
+                              <div className="text-xs text-gray-400">Current PPM</div>
+                              <div className="text-sm font-semibold text-gray-300">{parseFloat(point.current_ppm).toFixed(2)}</div>
+                            </div>
+                          )}
+                          {point.projected_final_score && point.projected_final_score > 0 && (
+                            <div className="bg-gray-900/50 rounded p-2 col-span-2">
+                              <div className="text-xs text-gray-400">Projected Final Score</div>
+                              <div className="text-sm font-semibold text-gray-300">{parseFloat(point.projected_final_score).toFixed(1)}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

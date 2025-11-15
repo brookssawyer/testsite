@@ -21,6 +21,24 @@ KENPOM_PASSWORD = os.getenv("KENPOM_PASSWORD", "")
 # The Odds API key for live game data and odds
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
 
+# ========== SPORTSBOOK CONFIGURATION ==========
+# Default sportsbook for odds (can be changed via frontend selector)
+# Common options: "fanduel", "draftkings", "betmgm", "caesars", "pointsbet", "bovada"
+# Set to "consensus" to use average of all available books
+DEFAULT_SPORTSBOOK = os.getenv("DEFAULT_SPORTSBOOK", "fanduel")
+
+# List of supported sportsbooks (in priority order if default not available)
+SUPPORTED_SPORTSBOOKS = [
+    "fanduel",
+    "draftkings",
+    "betmgm",
+    "caesars",
+    "pointsbet",
+    "bovada",
+    "wynnbet",
+    "unibet"
+]
+
 # ========== MONITORING CONFIGURATION ==========
 # Sport mode: "ncaa" or "nba" (for testing with live NBA games)
 SPORT_MODE = os.getenv("SPORT_MODE", "ncaa").lower()
@@ -32,12 +50,12 @@ POLL_INTERVAL = 15  # 15 seconds - faster refresh for ESPN and Odds API
 FILTER_LAST_MINUTE_GAMES = True  # Hide games with ≤1 minute remaining from the site
 MIN_TIME_REMAINING = 1.0  # Minimum minutes remaining to display a game
 
-# PPM thresholds for triggering alerts
-PPM_THRESHOLD_UNDER = 4.5   # Trigger UNDER when required PPM is HIGH (need to score fast)
-PPM_THRESHOLD_OVER = 1.5    # Trigger OVER when required PPM is LOW (scoring fast already)
+# PPM thresholds for triggering alerts (BALANCED - neutral between over/under)
+PPM_THRESHOLD_UNDER = 3.0   # Trigger UNDER when required PPM is HIGH (need to score fast)
+PPM_THRESHOLD_OVER = 3.0    # Trigger OVER when required PPM is LOW (scoring fast already)
 
 # PPM difference threshold (absolute difference between current_ppm and required_ppm)
-PPM_DIFFERENCE_THRESHOLD = 1.25  # Trigger when pace difference is significant
+PPM_DIFFERENCE_THRESHOLD = 0.5  # Trigger when pace difference is significant (more responsive)
 
 # Legacy alias for backward compatibility
 PPM_THRESHOLD = PPM_THRESHOLD_UNDER
@@ -47,38 +65,39 @@ STATS_REFRESH_HOURS = 24
 
 # ========== CONFIDENCE SCORING WEIGHTS ==========
 # These can be adjusted via admin panel
+# BALANCED - Reduced under-favoring bonuses by ~40% for neutrality
 CONFIDENCE_WEIGHTS = {
     # Pace factors (possessions per game)
     "slow_pace_threshold": 67,      # Below this = slow
     "fast_pace_threshold": 72,      # Above this = fast
-    "slow_pace_bonus": 12,          # Points per team
-    "medium_pace_bonus": 5,
-    "fast_pace_penalty": -10,
+    "slow_pace_bonus": 7,           # Reduced from 12 (favors under)
+    "medium_pace_bonus": 3,         # Reduced from 5
+    "fast_pace_penalty": -6,        # Reduced from -10 (more neutral)
 
     # 3-Point factors
     "low_3p_rate_threshold": 0.30,  # 30% of FGA
     "high_3p_pct_threshold": 0.38,  # 38% accuracy
-    "low_3p_rate_bonus": 8,
-    "high_3p_pct_penalty": -5,
+    "low_3p_rate_bonus": 5,         # Reduced from 8 (favors under)
+    "high_3p_pct_penalty": -5,      # Unchanged (already balanced)
 
     # Free throw factors
     "low_ft_rate_threshold": 18,    # FTA per game
     "high_ft_rate_threshold": 24,
-    "low_ft_rate_bonus": 6,
-    "high_ft_rate_penalty": -6,
+    "low_ft_rate_bonus": 4,         # Reduced from 6 (favors under)
+    "high_ft_rate_penalty": -6,     # Unchanged (already balanced)
 
     # Turnover factors
     "high_to_rate_threshold": 14,   # TO per game
-    "high_to_rate_bonus": 5,
+    "high_to_rate_bonus": 3,        # Reduced from 5 (favors under)
 
     # Defensive factors
     "strong_defense_threshold": 95, # Points per 100 poss
-    "strong_defense_bonus": 10,
+    "strong_defense_bonus": 6,      # Reduced from 10 (favors under)
 
     # Matchup bonuses
-    "both_slow_bonus": 15,
-    "both_strong_defense_bonus": 10,
-    "pace_mismatch_penalty": -5,
+    "both_slow_bonus": 9,           # Reduced from 15 (favors under)
+    "both_strong_defense_bonus": 6, # Reduced from 10 (favors under)
+    "pace_mismatch_penalty": -5,    # Unchanged (already balanced)
 }
 
 # Unit sizing based on confidence

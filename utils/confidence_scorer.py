@@ -9,8 +9,9 @@ import config
 
 class ConfidenceScorer:
     """
-    Calculates confidence scores (0-100) for under bets
-    based on team statistics and matchup characteristics
+    Calculates confidence scores (0-100) for over OR under bets
+    based on team statistics and matchup characteristics.
+    BALANCED - Symmetric scoring for both bet types.
     """
 
     def __init__(self, custom_weights: Optional[Dict] = None):
@@ -305,19 +306,27 @@ class ConfidenceScorer:
     def _evaluate_ppm_severity(self, required_ppm: float) -> float:
         """
         Adjust confidence based on how difficult the required PPM is
+        BALANCED - Symmetric scoring for both high PPM (under) and low PPM (over)
 
         Higher PPM = harder to hit = more confident in under
+        Lower PPM = easier to hit = more confident in under (but less bonus)
         """
         if required_ppm > 6.0:
-            return 15  # Very difficult pace needed
+            return 12  # Very difficult pace needed (favors under)
         elif required_ppm > 5.5:
-            return 10
+            return 8
         elif required_ppm > 5.0:
-            return 5
+            return 4
         elif required_ppm > 4.5:
             return 0
+        elif required_ppm > 3.5:
+            return -4  # Moderate pace (slightly favors over)
+        elif required_ppm > 2.5:
+            return -8  # Low PPM needed (favors over)
+        elif required_ppm > 2.0:
+            return -10
         else:
-            return -10  # Easier to hit over
+            return -12  # Very low PPM (strongly favors over) - symmetric to >6.0
 
     def _evaluate_over_pace(self, required_ppm: float, current_ppm: float) -> float:
         """

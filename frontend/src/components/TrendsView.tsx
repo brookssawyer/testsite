@@ -120,11 +120,15 @@ export default function TrendsView({ liveGames = [], preSelectedGameId, hideSele
             </div>
           </div>
 
-          {/* Total Score Progression */}
+          {/* Total Score vs O/U Line - OVERLAID */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-lg font-bold mb-4">Total Score Progression</h3>
+            <h3 className="text-lg font-bold mb-4">Total Score vs Over/Under Line</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Shows how the actual total score compares to the O/U line throughout the game.
+              When the score crosses above the line, the game is trending OVER. When below, trending UNDER.
+            </p>
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis
@@ -135,6 +139,7 @@ export default function TrendsView({ liveGames = [], preSelectedGameId, hideSele
                   <YAxis
                     stroke="#9CA3AF"
                     style={{ fontSize: '12px' }}
+                    label={{ value: 'Points', angle: -90, position: 'insideLeft', style: { fill: '#9CA3AF' } }}
                   />
                   <Tooltip
                     contentStyle={{
@@ -142,21 +147,43 @@ export default function TrendsView({ liveGames = [], preSelectedGameId, hideSele
                       border: '1px solid #374151',
                       borderRadius: '8px',
                     }}
+                    formatter={(value: any, name: string) => {
+                      if (typeof value === 'number') {
+                        return [value.toFixed(1), name];
+                      }
+                      return [value, name];
+                    }}
                   />
-                  <Legend />
+                  <Legend
+                    wrapperStyle={{ paddingTop: '10px' }}
+                  />
+                  {/* Opening Line Reference */}
                   <ReferenceLine
                     y={chartData[0]?.ouLine}
-                    label="Opening Line"
+                    label={{ value: `Opening Line (${chartData[0]?.ouLine})`, position: 'right', fill: '#F59E0B', fontSize: 11 }}
                     stroke="#F59E0B"
                     strokeDasharray="5 5"
+                    strokeWidth={1}
                   />
+                  {/* Current O/U Line - steps when line moves */}
+                  <Line
+                    type="stepAfter"
+                    dataKey="ouLine"
+                    stroke="#A855F7"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#A855F7', strokeWidth: 2 }}
+                    name="Current O/U Line"
+                    activeDot={{ r: 6 }}
+                  />
+                  {/* Total Score - smooth progression */}
                   <Line
                     type="monotone"
                     dataKey="totalPoints"
                     stroke="#10B981"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#10B981', strokeWidth: 2 }}
                     name="Total Score"
+                    activeDot={{ r: 6 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -165,52 +192,15 @@ export default function TrendsView({ liveGames = [], preSelectedGameId, hideSele
             )}
           </div>
 
-          {/* O/U Line Movement */}
+          {/* Required PPM vs Current PPM - OVERLAID */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-lg font-bold mb-4">Over/Under Line Movement</h3>
+            <h3 className="text-lg font-bold mb-4">Scoring Pace Analysis (PPM)</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Shows how the actual game pace (Current PPM) compares to what's needed to hit the over (Required PPM).
+              When current pace exceeds required, the game is trending OVER. When below, trending UNDER.
+            </p>
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis
-                    dataKey="time"
-                    stroke="#9CA3AF"
-                    style={{ fontSize: '12px' }}
-                  />
-                  <YAxis
-                    stroke="#9CA3AF"
-                    style={{ fontSize: '12px' }}
-                    domain={['dataMin - 2', 'dataMax + 2']}
-                    label={{ value: 'O/U Line', angle: -90, position: 'insideLeft', style: { fill: '#9CA3AF' } }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1F2937',
-                      border: '1px solid #374151',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    type="stepAfter"
-                    dataKey="ouLine"
-                    stroke="#A855F7"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: '#A855F7' }}
-                    name="O/U Line"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-gray-400 text-center py-12">No data available yet.</p>
-            )}
-          </div>
-
-          {/* Required PPM vs Current PPM */}
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h3 className="text-lg font-bold mb-4">Scoring Pace (PPM)</h3>
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                   <XAxis
@@ -229,25 +219,43 @@ export default function TrendsView({ liveGames = [], preSelectedGameId, hideSele
                       border: '1px solid #374151',
                       borderRadius: '8px',
                     }}
+                    formatter={(value: any, name: string) => {
+                      if (typeof value === 'number') {
+                        return [value.toFixed(2), name];
+                      }
+                      return [value, name];
+                    }}
                   />
-                  <Legend />
-                  <ReferenceLine y={4.5} label="UNDER Threshold" stroke="#3B82F6" strokeDasharray="5 5" />
-                  <ReferenceLine y={1.5} label="OVER Threshold" stroke="#10B981" strokeDasharray="5 5" />
+                  <Legend
+                    wrapperStyle={{ paddingTop: '10px' }}
+                  />
+                  {/* Balanced threshold lines (updated to 3.0) */}
+                  <ReferenceLine
+                    y={3.0}
+                    label={{ value: "Trigger Threshold (3.0)", position: 'right', fill: '#9CA3AF', fontSize: 12 }}
+                    stroke="#6B7280"
+                    strokeDasharray="5 5"
+                    strokeWidth={2}
+                  />
+                  {/* Required PPM - what pace is needed to hit the over */}
                   <Line
                     type="monotone"
                     dataKey="requiredPpm"
                     stroke="#F59E0B"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    name="Required PPM"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#F59E0B', strokeWidth: 2 }}
+                    name="Required PPM (to hit Over)"
+                    activeDot={{ r: 6 }}
                   />
+                  {/* Current PPM - actual game pace */}
                   <Line
                     type="monotone"
                     dataKey="currentPpm"
                     stroke="#8B5CF6"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    name="Current PPM"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#8B5CF6', strokeWidth: 2 }}
+                    name="Current PPM (actual pace)"
+                    activeDot={{ r: 6 }}
                   />
                 </LineChart>
               </ResponsiveContainer>

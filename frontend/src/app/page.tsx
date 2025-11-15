@@ -408,7 +408,7 @@ export default function Dashboard() {
                   {filter === 'triggered' ? 'Active Opportunities' : 'Live Games'} ({sortedGames.length})
                 </h2>
                 <p className="text-sm text-gray-400 mt-1">
-                  Sorted by: <span className="text-purple-400 font-medium">
+                  Sorted by: <span className="text-yellow-400 font-medium">
                     {sortBy === 'confidence' ? 'Confidence' :
                      sortBy === 'time' ? 'Time' :
                      sortBy === 'required_ppm' ? 'Required PPM' :

@@ -92,12 +92,17 @@ class AISummaryGenerator:
     def _get_system_prompt(self) -> str:
         """Get the system prompt that defines the AI's role"""
         return """You are an expert NCAA basketball betting analyst with deep knowledge of:
-- Live in-game betting strategies (especially under/over totals)
+- Live in-game betting strategies for over/under totals
 - Team pace, efficiency, and defensive metrics
 - How game situations affect scoring (halftime adjustments, foul trouble, time management)
 - Points Per Minute (PPM) analysis for live totals
 
-Your job: Analyze live game data and provide sharp, actionable betting recommendations.
+IMPORTANT: You must provide INDEPENDENT analysis. DO NOT simply agree with any system recommendations provided in the data. Analyze the game objectively and form your own conclusion about whether to bet OVER, UNDER, or PASS.
+
+Consider BOTH over and under scenarios equally. Your recommendation should be based solely on:
+- The actual game data and team metrics
+- Scoring pace and time remaining
+- Team tendencies and matchup dynamics
 
 Format your response EXACTLY as:
 RECOMMENDATION: [BET UNDER / BET OVER / PASS]
@@ -126,10 +131,9 @@ Be concise, direct, and focus on the most important factors. No fluff."""
         ou_line = game_data.get('ou_line', 0)
         required_ppm = game_data.get('required_ppm', 0)
         current_ppm = game_data.get('current_ppm', 0)
-        confidence_score = game_data.get('confidence_score', 0)
-        bet_type = game_data.get('bet_type', 'under')
+        # Note: We intentionally DO NOT extract bet_type - AI should be independent
 
-        # Build prompt
+        # Build prompt (NO PRE-DETERMINED BET TYPE)
         prompt = f"""Analyze this live NCAA basketball game for betting:
 
 GAME STATE:
@@ -140,7 +144,6 @@ BETTING DATA:
 Over/Under Line: {ou_line}
 Required PPM to hit Over: {required_ppm:.2f}
 Current PPM: {current_ppm:.2f}
-System Confidence: {confidence_score}% for {bet_type.upper()}
 """
 
         # Add team metrics if available
@@ -161,7 +164,8 @@ System Confidence: {confidence_score}% for {bet_type.upper()}
                 prompt += f"  3PT Rate: {away_metrics.get('three_point_rate', 'N/A')}\n"
                 prompt += f"  FT Rate: {away_metrics.get('free_throw_rate', 'N/A')}\n"
 
-        prompt += f"\nShould I bet {bet_type.upper()} on this game? Why or why not?"
+        # NEUTRAL QUESTION - no bias toward over or under
+        prompt += "\n\nBased ONLY on the data above, should I bet OVER, UNDER, or PASS on this game? Provide your independent analysis."
 
         return prompt
 

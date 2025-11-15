@@ -1,0 +1,476 @@
+================================================================================
+BASKETBALL BETTING APP - DEPLOYMENT QUESTIONS ANSWERED
+================================================================================
+
+1. CURRENT APP DETAILS
+================================================================================
+
+What type of app is it?
+-------------------------
+- Frontend: Next.js 14.0.4 (React 18.2.0, TypeScript 5.3.3)
+- Backend: FastAPI (Python 3.9.7+)
+- Architecture: Separated frontend/backend with REST API
+- Package Managers: npm (frontend), pip (backend)
+
+Any database?
+-------------
+NO traditional database. Uses file-based storage:
+- CSV files: data/ncaa_live_log.csv, data/ncaa_results.csv
+- JSON files: data/users.json (user accounts)
+- Cache files: cache/*.csv (team stats)
+
+Environment variables/secrets needed:
+-------------------------------------
+BACKEND (.env at project root):
+  REQUIRED:
+    - ODDS_API_KEY=your-api-key          # Get from the-odds-api.com
+    - SECRET_KEY=random-secret           # For JWT authentication
+    - USE_KENPOM=false                   # true for premium, false for free ESPN
+    - SPORT_MODE=ncaa                    # "ncaa" or "nba"
+
+  OPTIONAL:
+    - KENPOM_EMAIL=email@example.com     # Only if USE_KENPOM=true
+    - KENPOM_PASSWORD=password           # Only if USE_KENPOM=true
+    - OPENAI_API_KEY=sk-...              # For AI game summaries
+    - ENVIRONMENT=production
+    - API_HOST=0.0.0.0
+    - API_PORT=8000
+
+FRONTEND (.env.local in /frontend/):
+    - NEXT_PUBLIC_API_URL=http://localhost:8000    # Local dev
+    - NEXT_PUBLIC_API_URL=https://your-backend-url # Production
+
+Dependencies and package managers used:
+---------------------------------------
+BACKEND (Python - pip):
+  - FastAPI 0.115.0
+  - Uvicorn 0.32.0
+  - Pandas 2.2.3
+  - Requests 2.31.0
+  - Python-dotenv 1.0.1
+  - KenPomPy 0.3.4 (optional)
+  - Sportsdataverse 0.0.39
+  - Python-jose 3.3.0
+  - OpenAI 1.54.0 (optional)
+  - See requirements.txt for full list
+
+FRONTEND (Node.js - npm):
+  - Next.js 14.0.4
+  - React 18.2.0
+  - TypeScript 5.3.3
+  - TailwindCSS 3.3.6
+  - Axios 1.6.2
+  - SWR 2.2.4
+  - Recharts 2.15.4
+  - See frontend/package.json for full list
+
+Build process required?
+-----------------------
+FRONTEND:
+  Development: cd frontend && npm run dev
+  Production:  cd frontend && npm run build && npm start
+
+BACKEND:
+  Development: python api/main.py
+  Production:  uvicorn api.main:app --host 0.0.0.0 --port $PORT
+
+MONITOR (Background Worker):
+  python monitor.py (runs continuously, polls every 15-30 seconds)
+
+
+2. HOSTING INFRASTRUCTURE DECISION
+================================================================================
+
+Where to host?
+--------------
+RECOMMENDED SETUP:
+  Backend (API + Monitor): Railway or Render
+  Frontend: Vercel
+
+YOUR APP ALREADY HAS CONFIGS FOR:
+  - Railway (Procfile + railway.json)
+  - Render (render.yaml with blueprint)
+  - Vercel (frontend/vercel.json)
+
+Platform Details:
+-----------------
+RAILWAY (Recommended for backend):
+  - Supports 2 processes (web + worker)
+  - Persistent file system (for CSV storage)
+  - Auto-deploy from GitHub
+  - Free tier: 500 hours/month
+  - Paid: $5/month for always-on
+
+RENDER (Alternative for backend):
+  - Blueprint ready (render.yaml exists)
+  - Free tier: 750 hours/month (sleeps after 15 min)
+  - Paid: $7/service/month (~$14 total)
+
+VERCEL (Recommended for frontend):
+  - Designed for Next.js
+  - Auto-deploy from GitHub
+  - Free for personal projects
+  - Automatic SSL certificates
+
+Budget and technical comfort level:
+-----------------------------------
+COST ESTIMATES:
+  Free Tier: $0/month
+    - Railway 500 hrs + Vercel free
+    - Render free tier (with sleep)
+
+  Paid Tier: $5-30/month
+    - Railway: $5-10/month (always-on)
+    - OR Render: $14/month (2 services)
+    - Vercel: Free
+    - The Odds API: $0-10/month (depending on usage)
+    - KenPom: $20/year (optional premium stats)
+
+TECHNICAL LEVEL NEEDED:
+  - Basic: Push to GitHub, click deploy buttons
+  - No Docker knowledge required
+  - No server management needed
+  - Platforms handle everything automatically
+
+
+3. DOMAIN CONFIGURATION
+================================================================================
+
+Where did you register the domain?
+-----------------------------------
+NOT REQUIRED TO START. Default URLs provided:
+  - Railway: https://your-app.railway.app
+  - Render: https://your-app.onrender.com
+  - Vercel: https://your-app.vercel.app
+
+IF YOU WANT CUSTOM DOMAIN:
+  - Register at: Namecheap, GoDaddy, Google Domains, etc.
+  - Point DNS to platform (they provide instructions)
+  - Cost: ~$10-15/year
+
+Access to DNS settings:
+-----------------------
+  - If using default URLs: NOT NEEDED
+  - If custom domain: Update A/CNAME records via registrar
+
+SSL certificate needs:
+----------------------
+  - Automatic and FREE via Let's Encrypt
+  - All platforms (Railway/Render/Vercel) provide this
+  - Nothing to configure - works automatically
+
+
+4. DEPLOYMENT METHOD
+================================================================================
+
+RECOMMENDED: Git-based deployment
+
+How it works:
+-------------
+1. Push code to GitHub repository
+2. Connect Railway/Render to your GitHub repo
+3. Connect Vercel to your GitHub repo
+4. Set environment variables on each platform
+5. Auto-deploys on every git push to main branch
+
+Steps:
+------
+BACKEND (Railway):
+  1. Go to railway.app
+  2. "New Project" → "Deploy from GitHub repo"
+  3. Select your basketball-betting repo
+  4. Railway auto-detects Procfile
+  5. Add environment variables (ODDS_API_KEY, SECRET_KEY, etc.)
+  6. Deploy (runs both API server and monitor worker)
+
+FRONTEND (Vercel):
+  1. Go to vercel.com
+  2. "New Project" → Import from GitHub
+  3. Root Directory: "frontend"
+  4. Framework: Next.js (auto-detected)
+  5. Add environment variable: NEXT_PUBLIC_API_URL=https://your-railway-url
+  6. Deploy
+
+ALTERNATIVE METHODS:
+--------------------
+Docker containerization?
+  - Not required (but could be done)
+  - Railway uses Nixpacks (automatic containerization)
+  - No Dockerfile needed
+
+Direct file upload?
+  - Not recommended
+  - Git-based is easier and supports auto-deploy
+
+CI/CD pipeline?
+  - Not currently configured
+  - Built-in auto-deploy on git push (Railway/Vercel provide this)
+  - Could add GitHub Actions if needed
+
+
+5. CRITICAL FILES
+================================================================================
+
+Files Claude Code should check:
+--------------------------------
+DEPLOYMENT CONFIGS:
+  ✓ Procfile - Railway deployment (web + worker processes)
+  ✓ railway.json - Railway settings
+  ✓ render.yaml - Render blueprint (2 services defined)
+  ✓ frontend/vercel.json - Vercel config for Next.js
+  ✓ DEPLOY_RENDER.md - Step-by-step deployment guide (already exists!)
+
+DEPENDENCIES:
+  ✓ requirements.txt - Python backend dependencies
+  ✓ frontend/package.json - Node.js frontend dependencies
+
+CONFIGURATION:
+  ✓ config.py - Central Python configuration
+  ✓ .env.example - Environment variable template
+  ✓ frontend/next.config.js - Next.js configuration
+  ✓ frontend/tsconfig.json - TypeScript config
+  ✓ frontend/tailwind.config.js - TailwindCSS config
+
+DOCUMENTATION:
+  ✓ README.md - Main documentation
+  ✓ CLAUDE.md - Developer guide with deployment notes
+  ✓ PROJECT_SUMMARY.txt - Project overview
+
+DATABASE MIGRATION/SEED FILES:
+  ✗ NONE NEEDED - File-based storage auto-creates on first run
+  - Default admin user created automatically (admin/changeme)
+  - CSV files created automatically
+  - No migrations to run
+
+
+6. RUNNING SERVICES
+================================================================================
+
+Services that need to run:
+---------------------------
+DEVELOPMENT (3 separate terminals):
+  Terminal 1: cd /path/to/project && python api/main.py
+  Terminal 2: cd /path/to/project && python monitor.py
+  Terminal 3: cd /path/to/project/frontend && npm run dev
+
+PRODUCTION (2 processes - handled by Procfile):
+  Process 1 (web): uvicorn api.main:app --host 0.0.0.0 --port $PORT
+  Process 2 (worker): python monitor.py
+  Frontend: Deployed separately to Vercel (serverless)
+
+Ports used:
+-----------
+  - API Server: 8000 (local), $PORT (production)
+  - Frontend: 3000 (local dev), 80/443 (production via Vercel)
+  - Monitor: No port (background worker)
+
+Dependencies between services:
+-------------------------------
+  1. Frontend → API (Frontend polls API every 20 seconds)
+  2. API → Monitor (API reads CSV files written by Monitor)
+  3. Monitor → The Odds API (Polls every 15-30 seconds)
+
+Data Flow:
+----------
+  The Odds API → Monitor → CSV Files → API → Frontend
+  KenPom/ESPN ↗
+
+
+7. DIRECTORY STRUCTURE
+================================================================================
+
+/Users/brookssawyer/Desktop/basketball-betting/
+├── api/                  # FastAPI backend
+│   ├── main.py          # API endpoints
+│   └── auth.py          # Authentication
+├── frontend/            # Next.js app
+│   ├── src/
+│   ├── package.json
+│   └── vercel.json
+├── utils/               # Python utilities
+│   ├── team_stats.py
+│   ├── confidence_scorer.py
+│   └── ai_summary.py
+├── data/                # CSV/JSON storage (gitignored)
+├── cache/               # Team stats cache (gitignored)
+├── logs/                # Application logs (gitignored)
+├── monitor.py           # Main polling script
+├── config.py            # Central configuration
+├── requirements.txt     # Python dependencies
+├── .env                 # Secrets (gitignored)
+├── .env.example         # Template
+├── Procfile             # Railway deployment
+├── railway.json         # Railway config
+├── render.yaml          # Render blueprint
+└── README.md            # Documentation
+
+
+8. QUICK START DEPLOYMENT GUIDE
+================================================================================
+
+Step 1: Prerequisites
+---------------------
+☐ Code pushed to GitHub (repo exists at github.com/brookssawyer/testsite)
+☐ The Odds API key obtained (https://the-odds-api.com)
+☐ Choose hosting: Railway or Render for backend
+
+Step 2: Deploy Backend (Railway - Recommended)
+-----------------------------------------------
+1. Go to https://railway.app
+2. Sign up/login with GitHub
+3. Click "New Project"
+4. Select "Deploy from GitHub repo"
+5. Choose: brookssawyer/testsite
+6. Railway auto-detects Procfile and deploys
+7. Add Environment Variables:
+   - ODDS_API_KEY=your-key
+   - SECRET_KEY=generate-random-string-here
+   - USE_KENPOM=false
+   - SPORT_MODE=ncaa
+   - ENVIRONMENT=production
+8. Wait for deploy (2-3 minutes)
+9. Copy the generated URL (e.g., https://basketball-betting-production.up.railway.app)
+
+Step 3: Deploy Frontend (Vercel)
+---------------------------------
+1. Go to https://vercel.com
+2. Sign up/login with GitHub
+3. Click "New Project"
+4. Import: brookssawyer/testsite
+5. Configure:
+   - Root Directory: frontend
+   - Framework Preset: Next.js (auto-detected)
+6. Add Environment Variable:
+   - NEXT_PUBLIC_API_URL=https://your-railway-url-from-step2
+7. Click "Deploy"
+8. Wait 2-3 minutes
+9. Visit your live site!
+
+Step 4: Test
+------------
+1. Visit Vercel URL
+2. Login with: admin / changeme
+3. Should see live games (if any NCAA games are live)
+4. Check browser console for errors
+5. Verify data updates every 20-30 seconds
+
+Step 5: Post-Deployment
+-----------------------
+☐ Change default password (admin/changeme)
+☐ Monitor Railway logs for errors
+☐ Check The Odds API usage (500 requests/month on free tier)
+☐ Bookmark your Vercel URL
+☐ Optional: Add custom domain
+
+
+9. TROUBLESHOOTING
+================================================================================
+
+Frontend can't reach backend:
+------------------------------
+- Check NEXT_PUBLIC_API_URL is set correctly in Vercel
+- Verify Railway backend is running (check logs)
+- Check for CORS errors in browser console
+
+No live games showing:
+----------------------
+- Check if NCAA games are actually live (season: Nov-Apr)
+- Verify ODDS_API_KEY is set correctly
+- Check Railway logs for API errors
+- Monitor auto-shuts down after 5 min of no games
+
+Authentication not working:
+---------------------------
+- Default login: admin / changeme
+- Check SECRET_KEY is set in Railway
+- Clear browser cookies and try again
+
+Monitor not running:
+--------------------
+- Check Railway shows 2 processes (web + worker)
+- Verify Procfile has both web and worker lines
+- Check logs for errors
+
+API rate limit exceeded:
+------------------------
+- Free tier: 500 requests/month
+- Monitor uses 2-4 requests/min when games are live
+- Upgrade to paid tier if needed ($10+/month)
+
+
+10. IMPORTANT NOTES
+================================================================================
+
+Data Persistence:
+-----------------
+- All data stored in CSV/JSON files
+- Requires persistent file system
+- Railway and Render provide this (included)
+- Data automatically created on first run
+
+Authentication:
+---------------
+- Default user: admin / changeme
+- CHANGE PASSWORD IMMEDIATELY after deployment
+- Users stored in data/users.json
+
+API Usage:
+----------
+- The Odds API free tier: 500 requests/month
+- Monitor polls every 15-30 seconds during games
+- Auto-shuts down after 5 minutes of no live games
+- Monitor usage carefully during season
+
+Sport Modes:
+------------
+- NCAA: College basketball (default)
+- NBA: Professional basketball
+- Toggle via SPORT_MODE environment variable
+- KenPom only works for NCAA
+
+Cost Management:
+----------------
+FREE TIER LIMITS:
+  - Railway: 500 hours/month (sleep after inactivity)
+  - Render: 750 hours/month (sleep after 15 min)
+  - The Odds API: 500 requests/month
+  - Vercel: Unlimited for personal projects
+
+TO STAY FREE:
+  - Use Railway or Render free tier
+  - Monitor API usage carefully
+  - Use ESPN stats (USE_KENPOM=false)
+  - Don't run during off-season
+
+
+11. SUPPORT RESOURCES
+================================================================================
+
+Existing Documentation:
+-----------------------
+- README.md - Main documentation
+- CLAUDE.md - Developer guide
+- DEPLOY_RENDER.md - Detailed Render deployment steps
+- .env.example - Environment variable template
+
+Platform Documentation:
+-----------------------
+- Railway: https://docs.railway.app
+- Render: https://render.com/docs
+- Vercel: https://vercel.com/docs
+- The Odds API: https://the-odds-api.com/docs
+
+Community Help:
+---------------
+- Railway Discord: https://discord.gg/railway
+- Vercel Discord: https://discord.gg/vercel
+- GitHub repo issues: github.com/brookssawyer/testsite/issues
+
+
+================================================================================
+END OF DEPLOYMENT ANSWERS
+================================================================================
+
+Generated: 2025-11-13
+App: NCAA Basketball Live Betting Monitor
+Repository: github.com/brookssawyer/testsite

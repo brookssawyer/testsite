@@ -39,6 +39,10 @@ class ESPNStatsFetcher:
         - ft_pct: Free throw percentage
         - oreb_pct: Offensive rebounding percentage
         - to_rate: Turnovers per game
+        - efg_pct: Effective FG% (NEW)
+        - ts_pct: True Shooting % (NEW)
+        - two_p_pct: 2-Point FG% (NEW)
+        - efficiency_margin: Off Eff - Def Eff (NEW)
         """
         # Check if we have recent cached data
         if not force_refresh and self._is_cache_valid():
@@ -138,6 +142,21 @@ class ESPNStatsFetcher:
             # Turnover rate
             to_rate = total_to / games_played if games_played > 0 else 0
 
+            # NEW ADVANCED METRICS (Phase 1)
+            # 1. Effective Field Goal % (eFG%) = (FGM + 0.5 × 3PM) / FGA
+            efg_pct = ((total_fgm + 0.5 * total_3pm) / total_fga * 100) if total_fga > 0 else 0
+
+            # 2. True Shooting % (TS%) = PTS / (2 × (FGA + 0.44 × FTA))
+            ts_pct = (total_points / (2 * (total_fga + 0.44 * total_fta)) * 100) if (total_fga + total_fta) > 0 else 0
+
+            # 3. 2-Point Field Goal %
+            two_point_m = total_fgm - total_3pm
+            two_point_a = total_fga - total_3pa
+            two_p_pct = (two_point_m / two_point_a * 100) if two_point_a > 0 else 0
+
+            # 4. Efficiency Margin (replaces AdjEM from KenPom)
+            efficiency_margin = off_eff - def_eff
+
             team_groups.append({
                 'team_id': team_id,
                 'team_name': team_name,
@@ -152,6 +171,11 @@ class ESPNStatsFetcher:
                 'ft_pct': ft_pct,
                 'oreb_pct': oreb_pct,
                 'to_rate': to_rate,
+                # New advanced metrics
+                'efg_pct': efg_pct,
+                'ts_pct': ts_pct,
+                'two_p_pct': two_p_pct,
+                'efficiency_margin': efficiency_margin,
                 'data_source': 'espn'
             })
 
@@ -169,6 +193,10 @@ class ESPNStatsFetcher:
         - three_p_pct: 3P%
         - ft_rate: FTA per game
         - to_rate: TO per game
+        - efg_pct: Effective FG% (NEW)
+        - ts_pct: True Shooting % (NEW)
+        - two_p_pct: 2-Point FG% (NEW)
+        - efficiency_margin: Off Eff - Def Eff (NEW)
         """
         if self.stats_cache is None:
             self.fetch_team_stats()
@@ -196,6 +224,11 @@ class ESPNStatsFetcher:
             "ft_rate": float(team_row["ft_rate"]),
             "to_rate": float(team_row["to_rate"]),
             "oreb_pct": float(team_row["oreb_pct"]),
+            # New advanced metrics
+            "efg_pct": float(team_row["efg_pct"]),
+            "ts_pct": float(team_row["ts_pct"]),
+            "two_p_pct": float(team_row["two_p_pct"]),
+            "efficiency_margin": float(team_row["efficiency_margin"]),
             "data_source": "espn"
         }
 

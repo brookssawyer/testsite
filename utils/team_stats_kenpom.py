@@ -103,9 +103,12 @@ class KenPomStatsFetcher:
             logger.warning(f"Team not found in KenPom data: {team_name}")
             return None
 
+        pace_value = float(team_row["AdjT"])
         return {
             "team_name": team_row["Team"],
-            "pace": float(team_row["AdjT"]),
+            "kenpom_rank": int(team_row.get("Rk", 0)),
+            "pace": pace_value,
+            "pace_per_game": pace_value,  # Alias for compatibility with CSV logger
             "off_efficiency": float(team_row["AdjO"]),
             "def_efficiency": float(team_row["AdjD"]),
             "adj_em": float(team_row["AdjEM"]),
