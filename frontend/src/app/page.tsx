@@ -174,8 +174,6 @@ export default function Dashboard() {
               >
                 Admin
               </a>
-<<<<<<< HEAD
-=======
 
               <button
                 onClick={() => auth.logout()}
@@ -183,7 +181,6 @@ export default function Dashboard() {
               >
                 Logout
               </button>
->>>>>>> origin/claude/add-password-protection-01PRWy4JFXCwdnPBw666Ldgb
             </div>
           </div>
 
