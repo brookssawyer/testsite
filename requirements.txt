@@ -13,7 +13,7 @@ setuptools>=65.0.0
 kenpompy==0.3.4
 sportsdataverse==0.0.39
 fuzzywuzzy==0.18.0
-python-Levenshtein==0.21.1
+Levenshtein==0.25.1
 
 # Data processing
 pandas==2.2.3
