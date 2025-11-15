@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
-import { games, stats } from '@/lib/api';
+import { games, stats, auth } from '@/lib/api';
 import GameCard from '@/components/GameCard';
 import TrendsView from '@/components/TrendsView';
 import CompletedGamesAnalysis from '@/components/CompletedGamesAnalysis';
@@ -25,13 +25,13 @@ export default function Dashboard() {
     refreshInterval: 60000,
   });
 
-  // Authentication disabled for testing
-  // useEffect(() => {
-  //   const token = localStorage.getItem('token');
-  //   if (!token) {
-  //     window.location.href = '/login';
-  //   }
-  // }, []);
+  // Authentication check - redirect to login if no token
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+    }
+  }, []);
 
   const liveGames = gamesData?.games || [];
 
@@ -72,15 +72,12 @@ export default function Dashboard() {
                 Admin
               </a>
 
-              {/* <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  window.location.href = '/login';
-                }}
+              <button
+                onClick={() => auth.logout()}
                 className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded text-sm font-medium"
               >
                 Logout
-              </button> */}
+              </button>
             </div>
           </div>
 
