@@ -286,19 +286,19 @@ export default function GameDetailModal({ gameId, gameTitle, onClose }: GameDeta
                           {point.required_ppm && (
                             <div className="bg-gray-900/50 rounded p-2">
                               <div className="text-xs text-gray-400">Required PPM</div>
-                              <div className="text-sm font-semibold text-gray-300">{parseFloat(point.required_ppm).toFixed(2)}</div>
+                              <div className="text-sm font-semibold text-gray-300">{point.required_ppm.toFixed(2)}</div>
                             </div>
                           )}
                           {point.current_ppm && point.current_ppm > 0 && (
                             <div className="bg-gray-900/50 rounded p-2">
                               <div className="text-xs text-gray-400">Current PPM</div>
-                              <div className="text-sm font-semibold text-gray-300">{parseFloat(point.current_ppm).toFixed(2)}</div>
+                              <div className="text-sm font-semibold text-gray-300">{point.current_ppm.toFixed(2)}</div>
                             </div>
                           )}
                           {point.projected_final_score && point.projected_final_score > 0 && (
                             <div className="bg-gray-900/50 rounded p-2 col-span-2">
                               <div className="text-xs text-gray-400">Projected Final Score</div>
-                              <div className="text-sm font-semibold text-gray-300">{parseFloat(point.projected_final_score).toFixed(1)}</div>
+                              <div className="text-sm font-semibold text-gray-300">{point.projected_final_score.toFixed(1)}</div>
                             </div>
                           )}
                         </div>
