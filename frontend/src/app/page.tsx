@@ -9,6 +9,9 @@ import TrendsView from '@/components/TrendsView';
 import CompletedGamesAnalysis from '@/components/CompletedGamesAnalysis';
 import AllGamesComparison from '@/components/AllGamesComparison';
 import GameDetailModal from '@/components/GameDetailModal';
+import RangeSlider from '@/components/RangeSlider';
+import SortControl from '@/components/SortControl';
+import Tooltip from '@/components/Tooltip';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import clsx from 'clsx';
 
@@ -155,8 +158,8 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-1">NCAA Basketball Monitor</h1>
-              <p className="text-sm text-brand-purple-200">Real-time betting intelligence</p>
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 tracking-tight">NCAA Basketball Monitor</h1>
+              <p className="text-base text-brand-purple-200 font-medium">Real-time betting intelligence powered by data</p>
             </div>
 
             <div className="flex gap-5 items-center">
@@ -185,6 +188,46 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+
+          {/* Performance Metrics Summary Row */}
+          {perfData && (
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="glass-card rounded-lg p-3 hover:shadow-elevation-2 transition-all">
+                <div className="text-xs text-deep-slate-400 mb-1 font-medium">Total Bets</div>
+                <div className="text-2xl font-bold text-white">{perfData.total_bets}</div>
+              </div>
+
+              <div className="glass-card rounded-lg p-3 hover:shadow-elevation-2 transition-all">
+                <div className="text-xs text-deep-slate-400 mb-1 font-medium">Win Rate</div>
+                <div className={clsx(
+                  'text-2xl font-bold',
+                  (perfData.win_rate ?? 0) >= 55 ? 'text-green-400' : 'text-brand-orange-400'
+                )}>
+                  {(perfData.win_rate ?? 0).toFixed(1)}%
+                </div>
+              </div>
+
+              <div className="glass-card rounded-lg p-3 hover:shadow-elevation-2 transition-all">
+                <div className="text-xs text-deep-slate-400 mb-1 font-medium">Unit Profit</div>
+                <div className={clsx(
+                  'text-2xl font-bold',
+                  (perfData.total_unit_profit ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                )}>
+                  {(perfData.total_unit_profit ?? 0) >= 0 ? '+' : ''}{(perfData.total_unit_profit ?? 0).toFixed(1)}u
+                </div>
+              </div>
+
+              <div className="glass-card rounded-lg p-3 hover:shadow-elevation-2 transition-all">
+                <div className="text-xs text-deep-slate-400 mb-1 font-medium">ROI</div>
+                <div className={clsx(
+                  'text-2xl font-bold',
+                  (perfData.roi ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                )}>
+                  {(perfData.roi ?? 0) >= 0 ? '+' : ''}{(perfData.roi ?? 0).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Tabs */}
           <div className="mt-5 flex gap-2 border-b border-brand-purple-700/30">
@@ -224,168 +267,52 @@ export default function Dashboard() {
 
           {/* Filters (only show for Live Games tab) */}
           {activeTab === 'live' && (
-            <div className="mt-5 flex gap-4 flex-wrap">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setFilter('triggered')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
-                    filter === 'triggered'
-                      ? 'bg-gradient-to-r from-brand-teal-600 to-brand-teal-500 text-white shadow-elevation-2'
-                      : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
-                  )}
-                >
-                  Triggered Only
-                </button>
-                <button
-                  onClick={() => setFilter('all')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
-                    filter === 'all'
-                      ? 'bg-gradient-to-r from-brand-teal-600 to-brand-teal-500 text-white shadow-elevation-2'
-                      : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
-                  )}
-                >
-                  All Games
-                </button>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSortBy('confidence')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
-                    sortBy === 'confidence'
-                      ? 'bg-gradient-to-r from-brand-purple-600 to-brand-purple-500 text-white shadow-elevation-2'
-                      : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
-                  )}
-                >
-                  Confidence
-                </button>
-                <button
-                  onClick={() => setSortBy('time')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
-                    sortBy === 'time'
-                      ? 'bg-gradient-to-r from-brand-purple-600 to-brand-purple-500 text-white shadow-elevation-2'
-                      : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
-                  )}
-                >
-                  Time
-                </button>
-              </div>
-
-              {/* PPM Sort Options */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSortBy('required_ppm')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
-                    sortBy === 'required_ppm'
-                      ? 'bg-gradient-to-r from-brand-orange-600 to-brand-orange-500 text-white shadow-elevation-2'
-                      : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
-                  )}
-                >
-                  Required PPM
-                </button>
-                <button
-                  onClick={() => setSortBy('current_ppm')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
-                    sortBy === 'current_ppm'
-                      ? 'bg-gradient-to-r from-brand-orange-600 to-brand-orange-500 text-white shadow-elevation-2'
-                      : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
-                  )}
-                >
-                  Current PPM
-                </button>
-                <button
-                  onClick={() => setSortBy('ppm_difference')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
-                    sortBy === 'ppm_difference'
-                      ? 'bg-gradient-to-r from-brand-orange-600 to-brand-orange-500 text-white shadow-elevation-2'
-                      : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
-                  )}
-                >
-                  PPM Diff
-                </button>
-              </div>
-
-              {/* Sort Direction Toggle */}
-              <button
-                onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
-                className="px-4 py-2 glass-card hover:bg-deep-slate-700/70 rounded-lg font-semibold text-sm text-deep-slate-300 flex items-center gap-2 transition-all shadow-elevation-1"
-                title={`Currently sorting ${sortDirection === 'desc' ? 'high to low' : 'low to high'}`}
-              >
-                {sortDirection === 'desc' ? (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                    High → Low
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                    Low → High
-                  </>
-                )}
-              </button>
-
-              {/* PPM Filters */}
-              <div className="flex gap-4 items-center">
-                <div className="flex gap-2 items-center">
-                  <span className="text-sm text-deep-slate-400 font-medium">Required PPM:</span>
-                  <input
-                    type="number"
-                    value={minRequiredPpm}
-                    onChange={(e) => setMinRequiredPpm(parseFloat(e.target.value) || 0)}
-                    step="0.5"
-                    min="0"
-                    max="10"
-                    className="input-modern w-20 text-sm"
-                    placeholder="Min"
-                  />
-                  <span className="text-deep-slate-600">-</span>
-                  <input
-                    type="number"
-                    value={maxRequiredPpm}
-                    onChange={(e) => setMaxRequiredPpm(parseFloat(e.target.value) || 10)}
-                    step="0.5"
-                    min="0"
-                    max="10"
-                    className="input-modern w-20 text-sm"
-                    placeholder="Max"
-                  />
+            <div className="mt-5 space-y-4">
+              {/* Filter and Sort Row */}
+              <div className="flex flex-wrap gap-4 items-center">
+                {/* View Filter */}
+                <div className="flex gap-2" role="group" aria-label="View filter">
+                  <button
+                    onClick={() => setFilter('triggered')}
+                    className={clsx(
+                      'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
+                      filter === 'triggered'
+                        ? 'bg-gradient-to-r from-brand-teal-600 to-brand-teal-500 text-white shadow-elevation-2'
+                        : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
+                    )}
+                    aria-pressed={filter === 'triggered'}
+                  >
+                    Triggered Only
+                  </button>
+                  <button
+                    onClick={() => setFilter('all')}
+                    className={clsx(
+                      'px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-elevation-1',
+                      filter === 'all'
+                        ? 'bg-gradient-to-r from-brand-teal-600 to-brand-teal-500 text-white shadow-elevation-2'
+                        : 'glass-card text-deep-slate-300 hover:bg-deep-slate-700/70'
+                    )}
+                    aria-pressed={filter === 'all'}
+                  >
+                    All Games
+                  </button>
                 </div>
 
-                <div className="flex gap-2 items-center">
-                  <span className="text-sm text-deep-slate-400 font-medium">Current PPM:</span>
-                  <input
-                    type="number"
-                    value={minCurrentPpm}
-                    onChange={(e) => setMinCurrentPpm(parseFloat(e.target.value) || 0)}
-                    step="0.5"
-                    min="0"
-                    max="10"
-                    className="input-modern w-20 text-sm"
-                    placeholder="Min"
-                  />
-                  <span className="text-gray-500">-</span>
-                  <input
-                    type="number"
-                    value={maxCurrentPpm}
-                    onChange={(e) => setMaxCurrentPpm(parseFloat(e.target.value) || 10)}
-                    step="0.5"
-                    min="0"
-                    max="10"
-                    className="w-20 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white"
-                    placeholder="Max"
-                  />
-                </div>
+                {/* Sort Control */}
+                <SortControl
+                  value={sortBy}
+                  direction={sortDirection}
+                  onChange={setSortBy}
+                  onDirectionChange={setSortDirection}
+                  options={[
+                    { value: 'confidence', label: 'Confidence' },
+                    { value: 'time', label: 'Time' },
+                    { value: 'required_ppm', label: 'Required PPM' },
+                    { value: 'current_ppm', label: 'Current PPM' },
+                    { value: 'ppm_difference', label: 'PPM Difference' },
+                  ]}
+                  className="flex-1"
+                />
 
                 <button
                   onClick={() => {
@@ -394,10 +321,40 @@ export default function Dashboard() {
                     setMinCurrentPpm(0);
                     setMaxCurrentPpm(10);
                   }}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-medium text-gray-300"
+                  className="px-4 py-2 glass-card hover:bg-deep-slate-700/70 rounded-lg text-sm font-medium text-deep-slate-300 transition-all shadow-elevation-1"
+                  aria-label="Reset all filters"
                 >
                   Reset Filters
                 </button>
+              </div>
+
+              {/* PPM Range Sliders */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 glass-card rounded-lg p-4">
+                <RangeSlider
+                  label="Required PPM Range"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={[minRequiredPpm, maxRequiredPpm]}
+                  onChange={([min, max]) => {
+                    setMinRequiredPpm(min);
+                    setMaxRequiredPpm(max);
+                  }}
+                  colorScheme="orange"
+                />
+
+                <RangeSlider
+                  label="Current PPM Range"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={[minCurrentPpm, maxCurrentPpm]}
+                  onChange={([min, max]) => {
+                    setMinCurrentPpm(min);
+                    setMaxCurrentPpm(max);
+                  }}
+                  colorScheme="teal"
+                />
               </div>
             </div>
           )}
@@ -409,21 +366,18 @@ export default function Dashboard() {
         {activeTab === 'live' ? (
           <>
             {/* Live Game Count */}
-            <div className="mb-6 flex justify-between items-center">
+            <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <h2 className="text-xl font-bold">
-                  {filter === 'triggered' ? 'Active Opportunities' : 'Live Games'} ({sortedGames.length})
+                <h2 className="text-2xl md:text-3xl font-bold text-white">
+                  {filter === 'triggered' ? 'Active Opportunities' : 'Live Games'} <span className="text-brand-purple-400">({sortedGames.length})</span>
                 </h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  Sorted by: <span className="text-yellow-400 font-medium">
-                    {sortBy === 'confidence' ? 'Confidence' :
-                     sortBy === 'time' ? 'Time' :
-                     sortBy === 'required_ppm' ? 'Required PPM' :
-                     sortBy === 'current_ppm' ? 'Current PPM' :
-                     sortBy === 'ppm_difference' ? 'PPM Difference' : sortBy}
-                  </span>
-                  {' '}
-                  ({sortDirection === 'desc' ? 'High → Low' : 'Low → High'})
+                <p className="text-sm text-deep-slate-400 mt-1">
+                  Showing {sortBy === 'confidence' ? 'highest confidence first' :
+                     sortBy === 'time' ? 'most recent first' :
+                     sortBy === 'required_ppm' ? 'highest required PPM first' :
+                     sortBy === 'current_ppm' ? 'fastest current pace first' :
+                     sortBy === 'ppm_difference' ? 'largest PPM difference first' : 'sorted results'}
+                  {sortDirection === 'asc' && ' (reversed)'}
                 </p>
               </div>
 

@@ -1,7 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import clsx from 'clsx';
+import Tooltip from './Tooltip';
+import CollapsibleSection from './CollapsibleSection';
 
 interface GameCardProps {
   game: any;
@@ -159,15 +161,15 @@ export default function GameCard({ game, onClick }: GameCardProps) {
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xl font-bold text-white">{game.away_team}</span>
-            <span className="text-deep-slate-500">@</span>
-            <span className="text-xl font-bold text-white">{game.home_team}</span>
+            <span className="text-2xl font-bold text-white leading-tight">{game.away_team}</span>
+            <span className="text-deep-slate-500 text-lg">@</span>
+            <span className="text-2xl font-bold text-white leading-tight">{game.home_team}</span>
           </div>
-          <div className="text-sm text-deep-slate-400 flex items-center gap-3">
-            <span className="bg-deep-slate-800 px-2 py-1 rounded">Period {game.period}</span>
-            <span className="font-mono font-semibold">{game.minutes_remaining}:{String(game.seconds_remaining || 0).padStart(2, '0')}</span>
-            <span className="text-deep-slate-500">•</span>
-            <span>{totalMinutesRemaining.toFixed(1)} min left</span>
+          <div className="text-xs text-deep-slate-400 flex items-center gap-2">
+            <span className="bg-deep-slate-800 px-2 py-0.5 rounded font-medium">Period {game.period}</span>
+            <span className="font-mono font-semibold text-sm">{game.minutes_remaining}:{String(game.seconds_remaining || 0).padStart(2, '0')}</span>
+            <span className="text-deep-slate-600">•</span>
+            <span className="text-xs">{totalMinutesRemaining.toFixed(1)} min left</span>
           </div>
         </div>
 
@@ -186,24 +188,37 @@ export default function GameCard({ game, onClick }: GameCardProps) {
 
       {/* Betting Recommendation Indicator */}
       {triggered && betRecommendation !== 'MONITOR' && (
-        <div className={clsx(
-          'mb-4 p-3 rounded-lg shadow-lg',
-          betRecStyle.containerClass
-        )}>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{betRecStyle.icon}</span>
-            <div className="flex-1">
-              <div className={clsx('text-sm', betRecStyle.textClass)}>
-                {betRecStyle.label}
-              </div>
-              {betStatusReason && (
-                <div className="text-xs mt-1 opacity-90 text-white">
-                  {betStatusReason}
+        <Tooltip
+          content={
+            betRecommendation === 'BET_NOW'
+              ? 'All conditions met: Confidence ≥65 AND (PPM ≥5.0 OR Confidence ≥75)'
+              : betRecommendation === 'WAIT'
+              ? 'Waiting for: Higher confidence (≥65) OR stronger PPM confirmation (≥5.0)'
+              : betRecommendation === 'DANGER_ZONE'
+              ? 'Avoid: Medium confidence (60-70) with weak PPM (<4.0) has only 50% win rate'
+              : 'Monitoring game for trigger conditions'
+          }
+          position="bottom"
+        >
+          <div className={clsx(
+            'mb-4 p-3 rounded-lg shadow-lg cursor-help',
+            betRecStyle.containerClass
+          )}>
+            <div className="flex items-center gap-2">
+              <span className="text-xl" aria-hidden="true">{betRecStyle.icon}</span>
+              <div className="flex-1">
+                <div className={clsx('text-sm font-bold', betRecStyle.textClass)}>
+                  {betRecStyle.label}
                 </div>
-              )}
+                {betStatusReason && (
+                  <div className="text-xs mt-1 opacity-90 text-white">
+                    {betStatusReason}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </Tooltip>
       )}
 
       {/* Score */}
@@ -243,31 +258,44 @@ export default function GameCard({ game, onClick }: GameCardProps) {
         </div>
       </div>
 
-      {/* Moneyline & Spread Odds */}
+      {/* Moneyline & Spread Odds - Collapsible */}
       {(game.home_moneyline || game.home_spread) && (
-        <div className="mb-4 p-3 bg-deep-slate-800/40 rounded-lg border border-deep-slate-700/50">
-          {game.home_moneyline && game.away_moneyline && (
-            <div className="mb-2">
-              <div className="text-xs text-deep-slate-400 mb-1">Moneyline</div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-brand-teal-400">{game.away_team}: {game.away_moneyline > 0 ? '+' : ''}{game.away_moneyline}</span>
-                <span className="text-brand-orange-400">{game.home_team}: {game.home_moneyline > 0 ? '+' : ''}{game.home_moneyline}</span>
-              </div>
+        <div className="mb-4">
+          <CollapsibleSection
+            title="Moneyline & Spread Odds"
+            defaultOpen={false}
+            variant="compact"
+            icon={
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+          >
+            <div className="space-y-2">
+              {game.home_moneyline && game.away_moneyline && (
+                <div>
+                  <div className="text-xs text-deep-slate-400 mb-1.5 font-medium">Moneyline</div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-brand-teal-400 font-semibold">{game.away_team}: {game.away_moneyline > 0 ? '+' : ''}{game.away_moneyline}</span>
+                    <span className="text-brand-orange-400 font-semibold">{game.home_team}: {game.home_moneyline > 0 ? '+' : ''}{game.home_moneyline}</span>
+                  </div>
+                </div>
+              )}
+              {game.home_spread && game.away_spread && (
+                <div className="pt-2 border-t border-deep-slate-700/50">
+                  <div className="text-xs text-deep-slate-400 mb-1.5 font-medium">Spread</div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-brand-teal-400 font-semibold">
+                      {game.away_team}: {game.away_spread > 0 ? '+' : ''}{game.away_spread} ({game.away_spread_odds > 0 ? '+' : ''}{game.away_spread_odds})
+                    </span>
+                    <span className="text-brand-orange-400 font-semibold">
+                      {game.home_team}: {game.home_spread > 0 ? '+' : ''}{game.home_spread} ({game.home_spread_odds > 0 ? '+' : ''}{game.home_spread_odds})
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-          {game.home_spread && game.away_spread && (
-            <div>
-              <div className="text-xs text-deep-slate-400 mb-1">Spread</div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-brand-teal-400">
-                  {game.away_team}: {game.away_spread > 0 ? '+' : ''}{game.away_spread} ({game.away_spread_odds > 0 ? '+' : ''}{game.away_spread_odds})
-                </span>
-                <span className="text-brand-orange-400">
-                  {game.home_team}: {game.home_spread > 0 ? '+' : ''}{game.home_spread} ({game.home_spread_odds > 0 ? '+' : ''}{game.home_spread_odds})
-                </span>
-              </div>
-            </div>
-          )}
+          </CollapsibleSection>
         </div>
       )}
 
@@ -463,12 +491,20 @@ export default function GameCard({ game, onClick }: GameCardProps) {
         )}
       </div>
 
-      {/* Team Stats - Redesigned with Data Visualization */}
+      {/* Team Stats - Collapsible with Data Visualization */}
       {triggered && (
-        <div className="border-t border-deep-slate-700/50 pt-4 mt-2">
-          <div className="text-xs font-semibold mb-4 text-gradient-purple-orange uppercase tracking-wider">
-            Team Matchup Analysis
-          </div>
+        <div className="mt-2">
+          <CollapsibleSection
+            title="Team Matchup Analysis"
+            defaultOpen={true}
+            variant="default"
+            icon={
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            }
+          >
+            <div>
 
           {/* Radial Efficiency Comparison */}
           <div className="flex justify-around items-center mb-5 p-4 glass-card rounded-xl">
@@ -560,16 +596,18 @@ export default function GameCard({ game, onClick }: GameCardProps) {
             </div>
           </div>
 
-          <div className="text-xs text-deep-slate-500 mt-3 flex justify-between px-2">
-            <span className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-brand-orange-500"></span>
-              <span>{game.home_team}</span>
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-brand-teal-500"></span>
-              <span>{game.away_team}</span>
-            </span>
-          </div>
+              <div className="text-xs text-deep-slate-500 mt-3 flex justify-between px-2">
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-brand-orange-500"></span>
+                  <span>{game.home_team}</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-brand-teal-500"></span>
+                  <span>{game.away_team}</span>
+                </span>
+              </div>
+            </div>
+          </CollapsibleSection>
         </div>
       )}
     </div>
