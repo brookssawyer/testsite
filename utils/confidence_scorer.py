@@ -33,19 +33,25 @@ class ConfidenceScorer:
         bet_type: Optional[str] = "under",
         current_ppm: Optional[float] = 0,
         home_fouls: Optional[int] = None,
-        away_fouls: Optional[int] = None
+        away_fouls: Optional[int] = None,
+        home_live_stats: Optional[Dict] = None,
+        away_live_stats: Optional[Dict] = None
     ) -> Dict:
         """
         Calculate confidence score for over or under bet
 
         Args:
-            home_metrics: Home team statistical metrics
-            away_metrics: Away team statistical metrics
+            home_metrics: Home team season statistical metrics
+            away_metrics: Away team season statistical metrics
             required_ppm: Required points per minute to hit over
             current_total: Current total points scored
             ou_line: Over/under line
             bet_type: "over" or "under" (default: "under")
             current_ppm: Current scoring pace (points per minute elapsed)
+            home_fouls: Home team fouls (from live stats)
+            away_fouls: Away team fouls (from live stats)
+            home_live_stats: Home team live in-game statistics
+            away_live_stats: Away team live in-game statistics
 
         Returns:
             Dict with:
@@ -130,6 +136,37 @@ class ConfidenceScorer:
             ppm_score = self._evaluate_ppm_severity(required_ppm)
         score += ppm_score
         breakdown["ppm_severity"] = ppm_score
+
+        # === LIVE STATS ANALYSIS (if available) ===
+        # Adjust confidence based on real-time game performance
+        if home_live_stats or away_live_stats:
+            # Shooting efficiency vs expectations
+            shooting_score, shooting_breakdown = self._evaluate_live_shooting(
+                home_metrics, away_metrics, home_live_stats, away_live_stats
+            )
+            score += shooting_score * multiplier
+            breakdown["live_shooting"] = shooting_breakdown
+
+            # Free throw impact on game flow
+            ft_impact_score, ft_impact_breakdown = self._evaluate_live_ft_impact(
+                home_live_stats, away_live_stats
+            )
+            score += ft_impact_score * multiplier
+            breakdown["live_ft_impact"] = ft_impact_breakdown
+
+            # Turnover rate affecting possessions
+            to_impact_score, to_impact_breakdown = self._evaluate_live_turnovers(
+                home_live_stats, away_live_stats
+            )
+            score += to_impact_score * multiplier
+            breakdown["live_turnovers"] = to_impact_breakdown
+
+            # Rebounding battle
+            reb_score, reb_breakdown = self._evaluate_live_rebounding(
+                home_live_stats, away_live_stats
+            )
+            score += reb_score * multiplier
+            breakdown["live_rebounding"] = reb_breakdown
 
         # Cap score at 0-100
         final_score = max(0, min(100, score))
@@ -415,6 +452,200 @@ class ConfidenceScorer:
             return 3.0
         else:
             return 0
+
+    def _evaluate_live_shooting(
+        self,
+        home_metrics: Dict,
+        away_metrics: Dict,
+        home_live_stats: Optional[Dict],
+        away_live_stats: Optional[Dict]
+    ) -> Tuple[float, Dict]:
+        """
+        Evaluate live shooting performance vs season averages
+        Hot shooting = likely OVER, Cold shooting = likely UNDER
+        """
+        score = 0
+        breakdown = {}
+
+        if not home_live_stats and not away_live_stats:
+            return 0, {"note": "No live stats available"}
+
+        # Compare live FG% to season eFG%
+        shooting_variance = []
+
+        if home_live_stats and home_metrics:
+            live_fg = home_live_stats.get('fg_pct', 0)
+            season_efg = home_metrics.get('efg_pct', 0)
+            if live_fg > 0 and season_efg > 0:
+                variance = live_fg - season_efg
+                shooting_variance.append(variance)
+                breakdown["home_variance"] = round(variance, 1)
+
+        if away_live_stats and away_metrics:
+            live_fg = away_live_stats.get('fg_pct', 0)
+            season_efg = away_metrics.get('efg_pct', 0)
+            if live_fg > 0 and season_efg > 0:
+                variance = live_fg - season_efg
+                shooting_variance.append(variance)
+                breakdown["away_variance"] = round(variance, 1)
+
+        if shooting_variance:
+            avg_variance = sum(shooting_variance) / len(shooting_variance)
+            breakdown["avg_variance"] = round(avg_variance, 1)
+
+            # Hot shooting (>5% above season avg) = favors OVER
+            # Cold shooting (<-5% below season avg) = favors UNDER
+            if avg_variance > 5:
+                score = -8  # Negative = favors over (will be flipped for under bets)
+                breakdown["note"] = "Hot shooting - favors OVER"
+            elif avg_variance < -5:
+                score = 8  # Positive = favors under
+                breakdown["note"] = "Cold shooting - favors UNDER"
+            elif avg_variance > 2:
+                score = -4
+                breakdown["note"] = "Above average shooting"
+            elif avg_variance < -2:
+                score = 4
+                breakdown["note"] = "Below average shooting"
+
+        return score, breakdown
+
+    def _evaluate_live_ft_impact(
+        self,
+        home_live_stats: Optional[Dict],
+        away_live_stats: Optional[Dict]
+    ) -> Tuple[float, Dict]:
+        """
+        Evaluate free throw impact on game flow
+        Lots of FTs slow the game = favors UNDER
+        """
+        score = 0
+        breakdown = {}
+
+        if not home_live_stats and not away_live_stats:
+            return 0, {"note": "No live stats available"}
+
+        total_ft_attempts = 0
+        if home_live_stats:
+            total_ft_attempts += home_live_stats.get('ft_attempted', 0)
+        if away_live_stats:
+            total_ft_attempts += away_live_stats.get('ft_attempted', 0)
+
+        breakdown["total_ft_attempts"] = total_ft_attempts
+
+        # High FT rate slows game
+        if total_ft_attempts > 20:
+            score = 6  # Strong indicator for under
+            breakdown["note"] = "Very high FT rate - game slowing"
+        elif total_ft_attempts > 15:
+            score = 4
+            breakdown["note"] = "High FT rate - favors UNDER"
+        elif total_ft_attempts > 10:
+            score = 2
+            breakdown["note"] = "Moderate FT rate"
+        else:
+            score = -2
+            breakdown["note"] = "Low FT rate - game flowing"
+
+        return score, breakdown
+
+    def _evaluate_live_turnovers(
+        self,
+        home_live_stats: Optional[Dict],
+        away_live_stats: Optional[Dict]
+    ) -> Tuple[float, Dict]:
+        """
+        Evaluate turnover rate affecting possessions
+        High turnovers = fewer possessions = favors UNDER
+        """
+        score = 0
+        breakdown = {}
+
+        if not home_live_stats and not away_live_stats:
+            return 0, {"note": "No live stats available"}
+
+        total_turnovers = 0
+        total_fg_attempts = 0
+
+        if home_live_stats:
+            total_turnovers += home_live_stats.get('turnovers', 0)
+            total_fg_attempts += home_live_stats.get('fg_attempted', 0)
+        if away_live_stats:
+            total_turnovers += away_live_stats.get('turnovers', 0)
+            total_fg_attempts += away_live_stats.get('fg_attempted', 0)
+
+        breakdown["total_turnovers"] = total_turnovers
+        breakdown["total_fg_attempts"] = total_fg_attempts
+
+        # High turnover rate (relative to possessions)
+        if total_fg_attempts > 0:
+            to_rate = total_turnovers / (total_fg_attempts / 10)  # Approximate possessions
+            breakdown["to_rate"] = round(to_rate, 2)
+
+            if to_rate > 2.0:
+                score = 5  # High turnovers = fewer possessions = under
+                breakdown["note"] = "Very high turnover rate - favors UNDER"
+            elif to_rate > 1.5:
+                score = 3
+                breakdown["note"] = "High turnover rate"
+            elif to_rate < 1.0:
+                score = -3
+                breakdown["note"] = "Low turnover rate - clean game"
+        else:
+            # Absolute turnover count
+            if total_turnovers > 15:
+                score = 4
+                breakdown["note"] = "High turnovers - fewer possessions"
+            elif total_turnovers < 8:
+                score = -2
+                breakdown["note"] = "Low turnovers"
+
+        return score, breakdown
+
+    def _evaluate_live_rebounding(
+        self,
+        home_live_stats: Optional[Dict],
+        away_live_stats: Optional[Dict]
+    ) -> Tuple[float, Dict]:
+        """
+        Evaluate rebounding battle
+        High offensive rebounding = extra possessions = favors OVER
+        """
+        score = 0
+        breakdown = {}
+
+        if not home_live_stats and not away_live_stats:
+            return 0, {"note": "No live stats available"}
+
+        total_off_rebounds = 0
+        total_rebounds = 0
+
+        if home_live_stats:
+            total_off_rebounds += home_live_stats.get('rebounds_offensive', 0)
+            total_rebounds += home_live_stats.get('rebounds_total', 0)
+        if away_live_stats:
+            total_off_rebounds += away_live_stats.get('rebounds_offensive', 0)
+            total_rebounds += away_live_stats.get('rebounds_total', 0)
+
+        breakdown["total_off_rebounds"] = total_off_rebounds
+        breakdown["total_rebounds"] = total_rebounds
+
+        if total_rebounds > 0:
+            off_reb_pct = (total_off_rebounds / total_rebounds) * 100
+            breakdown["off_reb_pct"] = round(off_reb_pct, 1)
+
+            # High offensive rebounding % = extra possessions = over
+            if off_reb_pct > 35:
+                score = -4  # Negative = favors over
+                breakdown["note"] = "High offensive rebounding - extra possessions"
+            elif off_reb_pct > 30:
+                score = -2
+                breakdown["note"] = "Above average offensive rebounding"
+            elif off_reb_pct < 20:
+                score = 2
+                breakdown["note"] = "Low offensive rebounding - limited second chances"
+
+        return score, breakdown
 
     def update_weights(self, new_weights: Dict):
         """Update scoring weights (for admin panel adjustments)"""

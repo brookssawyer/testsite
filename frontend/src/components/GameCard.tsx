@@ -26,6 +26,8 @@ export default function GameCard({ game, onClick }: GameCardProps) {
   const timeWeightedThreshold = parseFloat(game.time_weighted_threshold || 0);
   const homeFouls = parseInt(game.home_fouls || '0');
   const awayFouls = parseInt(game.away_fouls || '0');
+  const betRecommendation = game.bet_recommendation || 'MONITOR';
+  const betStatusReason = game.bet_status_reason || '';
 
   // Determine if projected score is over or under the line
   const projectedOverUnder = projectedFinalScore > ouLine ? 'over' : 'under';
@@ -64,6 +66,41 @@ export default function GameCard({ game, onClick }: GameCardProps) {
   };
 
   const betStyle = getBetTypeStyle();
+
+  // Bet recommendation styling
+  const getBetRecommendationStyle = () => {
+    if (betRecommendation === 'BET_NOW') {
+      return {
+        containerClass: 'bg-gradient-to-r from-green-600 to-green-500 border-2 border-green-400',
+        textClass: 'text-white font-bold',
+        icon: '✓',
+        label: 'BET NOW'
+      };
+    } else if (betRecommendation === 'WAIT') {
+      return {
+        containerClass: 'bg-gradient-to-r from-yellow-600 to-yellow-500 border-2 border-yellow-400',
+        textClass: 'text-white font-bold',
+        icon: '⏳',
+        label: 'WAIT FOR CONFIRMATION'
+      };
+    } else if (betRecommendation === 'DANGER_ZONE') {
+      return {
+        containerClass: 'bg-gradient-to-r from-red-600 to-red-500 border-2 border-red-400',
+        textClass: 'text-white font-bold',
+        icon: '⚠',
+        label: 'DANGER ZONE - AVOID'
+      };
+    } else {
+      return {
+        containerClass: 'bg-deep-slate-700 border border-deep-slate-600',
+        textClass: 'text-deep-slate-400',
+        icon: '👁',
+        label: 'MONITORING'
+      };
+    }
+  };
+
+  const betRecStyle = getBetRecommendationStyle();
 
   // Calculate stat percentages for progress bars
   const getStatPercentage = (value: number, max: number = 120) => Math.min((value / max) * 100, 100);
@@ -147,6 +184,28 @@ export default function GameCard({ game, onClick }: GameCardProps) {
         )}
       </div>
 
+      {/* Betting Recommendation Indicator */}
+      {triggered && betRecommendation !== 'MONITOR' && (
+        <div className={clsx(
+          'mb-4 p-3 rounded-lg shadow-lg',
+          betRecStyle.containerClass
+        )}>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{betRecStyle.icon}</span>
+            <div className="flex-1">
+              <div className={clsx('text-sm', betRecStyle.textClass)}>
+                {betRecStyle.label}
+              </div>
+              {betStatusReason && (
+                <div className="text-xs mt-1 opacity-90 text-white">
+                  {betStatusReason}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Score */}
       <div className="flex justify-between items-center mb-4">
         <div className="text-3xl font-bold text-white">
@@ -209,6 +268,79 @@ export default function GameCard({ game, onClick }: GameCardProps) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Live In-Game Statistics */}
+      {(game.home_fg_made || game.away_fg_made) && (
+        <div className="mb-4 p-4 bg-deep-slate-800/40 rounded-lg border border-deep-slate-700/50">
+          <div className="text-xs font-semibold mb-3 text-gradient-purple-orange uppercase tracking-wider">
+            Live In-Game Stats
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {/* Shooting Stats */}
+            <div className="text-center">
+              <div className="text-xs text-deep-slate-400 mb-1">FG%</div>
+              <div className="text-sm font-bold text-brand-orange-400">{game.home_fg_pct || 0}%</div>
+              <div className="text-xs text-deep-slate-500">{game.home_fg_made}/{game.home_fg_attempted}</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-xs text-deep-slate-400 mb-1">3P%</div>
+              <div className="text-sm font-bold text-brand-orange-400">{game.home_three_pct || 0}%</div>
+              <div className="text-xs text-deep-slate-500">{game.home_three_made}/{game.home_three_attempted}</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-xs text-deep-slate-400 mb-1">FT%</div>
+              <div className="text-sm font-bold text-brand-orange-400">{game.home_ft_pct || 0}%</div>
+              <div className="text-xs text-deep-slate-500">{game.home_ft_made}/{game.home_ft_attempted}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="text-center">
+              <div className="text-sm font-bold text-brand-teal-400">{game.away_fg_pct || 0}%</div>
+              <div className="text-xs text-deep-slate-500">{game.away_fg_made}/{game.away_fg_attempted}</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-sm font-bold text-brand-teal-400">{game.away_three_pct || 0}%</div>
+              <div className="text-xs text-deep-slate-500">{game.away_three_made}/{game.away_three_attempted}</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-sm font-bold text-brand-teal-400">{game.away_ft_pct || 0}%</div>
+              <div className="text-xs text-deep-slate-500">{game.away_ft_made}/{game.away_ft_attempted}</div>
+            </div>
+          </div>
+
+          {/* Possession Stats */}
+          <div className="pt-3 border-t border-deep-slate-700/50">
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <div className="text-xs text-deep-slate-400 mb-1">REB</div>
+                <div className="text-sm font-bold text-brand-orange-400">{game.home_rebounds || 0}</div>
+                <div className="text-sm font-bold text-brand-teal-400">{game.away_rebounds || 0}</div>
+              </div>
+              <div>
+                <div className="text-xs text-deep-slate-400 mb-1">AST</div>
+                <div className="text-sm font-bold text-brand-orange-400">{game.home_assists || 0}</div>
+                <div className="text-sm font-bold text-brand-teal-400">{game.away_assists || 0}</div>
+              </div>
+              <div>
+                <div className="text-xs text-deep-slate-400 mb-1">TO</div>
+                <div className="text-sm font-bold text-brand-orange-400">{game.home_turnovers || 0}</div>
+                <div className="text-sm font-bold text-brand-teal-400">{game.away_turnovers || 0}</div>
+              </div>
+              <div>
+                <div className="text-xs text-deep-slate-400 mb-1">FOULS</div>
+                <div className="text-sm font-bold text-brand-orange-400">{game.home_fouls || 0}</div>
+                <div className="text-sm font-bold text-brand-teal-400">{game.away_fouls || 0}</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

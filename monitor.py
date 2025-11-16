@@ -383,11 +383,21 @@ class NCAABettingMonitor:
 
             all_games = scores_response.json()
 
-            # Filter to only in-progress games (have scores but not completed)
+            # Separate live games from completed games
             live_games = []
+            completed_games = []
             for game in all_games:
-                if game.get("scores") and not game.get("completed", False):
-                    live_games.append(game)
+                if game.get("scores"):
+                    if game.get("completed", False):
+                        completed_games.append(game)
+                    else:
+                        live_games.append(game)
+
+            # TODO: Process completed games (requires async context)
+            # For now, completed games are handled in the main poll loop
+            # when they transition from live to completed
+            if completed_games:
+                logger.debug(f"Found {len(completed_games)} completed games (will be logged when detected in main loop)")
 
             if not live_games:
                 logger.info(f"No live {self.sport_mode.upper()} basketball games currently in progress")
@@ -622,21 +632,25 @@ class NCAABettingMonitor:
                         # Current pace is slower than needed = likely to go UNDER
                         bet_type = "under"
 
-            # Fetch ESPN closing line and fouls FIRST (needed for confidence calculation)
+            # Fetch ESPN closing line, fouls, and comprehensive stats FIRST (needed for confidence calculation)
             espn_closing_total = None
             home_fouls = None
             away_fouls = None
+            home_stats = {}
+            away_stats = {}
             try:
-                espn_odds = self.espn_odds_fetcher.fetch_game_odds(game_id)
-                if espn_odds:
-                    espn_closing_total = espn_odds.get("closing_total")
-                    home_fouls = espn_odds.get("home_fouls")
-                    away_fouls = espn_odds.get("away_fouls")
+                espn_data = self.espn_odds_fetcher.fetch_game_odds(game_id)
+                if espn_data:
+                    espn_closing_total = espn_data.get("closing_total")
+                    home_stats = espn_data.get("home_stats", {})
+                    away_stats = espn_data.get("away_stats", {})
+                    home_fouls = home_stats.get("fouls")
+                    away_fouls = away_stats.get("fouls")
             except Exception as e:
-                logger.debug(f"Could not fetch ESPN closing line for {game_id}: {e}")
+                logger.debug(f"Could not fetch ESPN data for {game_id}: {e}")
 
             # Calculate confidence score (even if not triggered, for logging)
-            # NOW includes foul data
+            # NOW includes foul data and live stats
             confidence_data = self.confidence_scorer.calculate_confidence(
                 home_metrics or {},
                 away_metrics or {},
@@ -646,11 +660,49 @@ class NCAABettingMonitor:
                 bet_type=bet_type,
                 current_ppm=current_ppm,
                 home_fouls=home_fouls,
-                away_fouls=away_fouls
+                away_fouls=away_fouls,
+                home_live_stats=home_stats,
+                away_live_stats=away_stats
             )
 
             confidence_score = confidence_data["confidence"]
             unit_recommendation = confidence_data["unit_recommendation"]
+
+            # ========== BETTING OPTIMIZATION: 3-STAGE WORKFLOW ==========
+            # Stage 1: DETECT (trigger met)
+            # Stage 2: WATCH (confidence calculated)
+            # Stage 3: CONFIRM (ready to bet)
+
+            bet_recommendation = "MONITOR"  # Default: just watching
+            bet_status_reason = ""
+
+            if trigger_flag:
+                # Check if we should actually bet based on optimized thresholds
+
+                # DANGER ZONE CHECK: Medium confidence + weak PPM = 50% win rate
+                if config.BLOCK_DANGER_ZONE:
+                    if 60 <= confidence_score <= 70 and required_ppm < config.MEDIUM_CONF_MIN_PPM:
+                        bet_recommendation = "DANGER_ZONE"
+                        bet_status_reason = f"Danger zone: conf={confidence_score:.0f}, PPM={required_ppm:.1f} < {config.MEDIUM_CONF_MIN_PPM}"
+                        unit_recommendation = 0  # Override to 0 units
+
+                # CONFIDENCE CHECK: Must meet minimum confidence
+                if bet_recommendation != "DANGER_ZONE":
+                    if confidence_score < config.MIN_CONFIDENCE_TO_BET:
+                        bet_recommendation = "WAIT"
+                        bet_status_reason = f"Confidence {confidence_score:.0f} < {config.MIN_CONFIDENCE_TO_BET} required"
+                        unit_recommendation = 0
+
+                    # PPM CONFIRMATION CHECK: Wait for strong momentum OR very high confidence
+                    elif required_ppm < config.PPM_CONFIRMATION_THRESHOLD and confidence_score < 75:
+                        bet_recommendation = "WAIT"
+                        bet_status_reason = f"Wait for PPM confirmation: {required_ppm:.1f} < {config.PPM_CONFIRMATION_THRESHOLD} (or conf 75+)"
+                        unit_recommendation = 0
+
+                    # ALL CHECKS PASSED - Ready to bet!
+                    else:
+                        bet_recommendation = "BET_NOW"
+                        bet_status_reason = f"✓ Conf={confidence_score:.0f}, PPM={required_ppm:.1f}"
 
             # Prepare log data
             log_data = {
@@ -679,6 +731,8 @@ class NCAABettingMonitor:
                 "spread_book": spread_book,
                 "home_fouls": home_fouls,
                 "away_fouls": away_fouls,
+                "home_stats": home_stats,
+                "away_stats": away_stats,
                 "required_ppm": round(required_ppm, 2),
                 "time_weighted_threshold": round(time_weighted_threshold, 2),
                 "current_ppm": round(current_ppm, 2),
@@ -692,6 +746,8 @@ class NCAABettingMonitor:
                 "away_metrics": away_metrics or {},
                 "confidence_score": round(confidence_score, 1),
                 "unit_size": unit_recommendation,
+                "bet_recommendation": bet_recommendation,
+                "bet_status_reason": bet_status_reason,
                 "notes": ""
             }
 
@@ -719,9 +775,8 @@ class NCAABettingMonitor:
             # Update game state tracking
             self._update_game_state(game, log_data, confidence_data)
 
-            # Check if game ended
-            if game.get("completed", False):
-                await self._handle_game_end(game)
+            # Note: Game completion is now handled separately in fetch_live_games()
+            # when completed games are detected, so no need to check here
 
         except Exception as e:
             logger.error(f"Error analyzing game: {e}")

@@ -46,6 +46,47 @@ class CSVLogger:
                 "Spread Book",
                 "Home Fouls",
                 "Away Fouls",
+                # Live shooting stats - Home
+                "Home FGM",
+                "Home FGA",
+                "Home FG%",
+                "Home 3PM",
+                "Home 3PA",
+                "Home 3P%",
+                "Home FTM",
+                "Home FTA",
+                "Home FT%",
+                # Live shooting stats - Away
+                "Away FGM",
+                "Away FGA",
+                "Away FG%",
+                "Away 3PM",
+                "Away 3PA",
+                "Away 3P%",
+                "Away FTM",
+                "Away FTA",
+                "Away FT%",
+                # Live possession stats - Home
+                "Home Rebounds",
+                "Home Off Rebounds",
+                "Home Def Rebounds",
+                "Home Assists",
+                "Home Steals",
+                "Home Blocks",
+                "Home Turnovers",
+                # Live possession stats - Away
+                "Away Rebounds",
+                "Away Off Rebounds",
+                "Away Def Rebounds",
+                "Away Assists",
+                "Away Steals",
+                "Away Blocks",
+                "Away Turnovers",
+                # Calculated live metrics
+                "Home Live eFG%",
+                "Home Live TS%",
+                "Away Live eFG%",
+                "Away Live TS%",
                 "Required PPM",
                 "Time Weighted Threshold",
                 "Current PPM",
@@ -57,6 +98,8 @@ class CSVLogger:
                 "Trigger Reasons",
                 "Confidence",
                 "Units",
+                "Bet Recommendation",
+                "Bet Status Reason",
                 "Home Pace",
                 "Home Off Eff",
                 "Home Def Eff",
@@ -163,6 +206,47 @@ class CSVLogger:
                 game_data.get("spread_book", ""),     # Spread Book
                 game_data.get("home_fouls", ""),      # Home Fouls
                 game_data.get("away_fouls", ""),      # Away Fouls
+                # Live shooting stats - Home
+                game_data.get("home_stats", {}).get("fg_made", ""),
+                game_data.get("home_stats", {}).get("fg_attempted", ""),
+                game_data.get("home_stats", {}).get("fg_pct", ""),
+                game_data.get("home_stats", {}).get("three_made", ""),
+                game_data.get("home_stats", {}).get("three_attempted", ""),
+                game_data.get("home_stats", {}).get("three_pct", ""),
+                game_data.get("home_stats", {}).get("ft_made", ""),
+                game_data.get("home_stats", {}).get("ft_attempted", ""),
+                game_data.get("home_stats", {}).get("ft_pct", ""),
+                # Live shooting stats - Away
+                game_data.get("away_stats", {}).get("fg_made", ""),
+                game_data.get("away_stats", {}).get("fg_attempted", ""),
+                game_data.get("away_stats", {}).get("fg_pct", ""),
+                game_data.get("away_stats", {}).get("three_made", ""),
+                game_data.get("away_stats", {}).get("three_attempted", ""),
+                game_data.get("away_stats", {}).get("three_pct", ""),
+                game_data.get("away_stats", {}).get("ft_made", ""),
+                game_data.get("away_stats", {}).get("ft_attempted", ""),
+                game_data.get("away_stats", {}).get("ft_pct", ""),
+                # Live possession stats - Home
+                game_data.get("home_stats", {}).get("rebounds_total", ""),
+                game_data.get("home_stats", {}).get("rebounds_offensive", ""),
+                game_data.get("home_stats", {}).get("rebounds_defensive", ""),
+                game_data.get("home_stats", {}).get("assists", ""),
+                game_data.get("home_stats", {}).get("steals", ""),
+                game_data.get("home_stats", {}).get("blocks", ""),
+                game_data.get("home_stats", {}).get("turnovers", ""),
+                # Live possession stats - Away
+                game_data.get("away_stats", {}).get("rebounds_total", ""),
+                game_data.get("away_stats", {}).get("rebounds_offensive", ""),
+                game_data.get("away_stats", {}).get("rebounds_defensive", ""),
+                game_data.get("away_stats", {}).get("assists", ""),
+                game_data.get("away_stats", {}).get("steals", ""),
+                game_data.get("away_stats", {}).get("blocks", ""),
+                game_data.get("away_stats", {}).get("turnovers", ""),
+                # Calculated live metrics
+                game_data.get("home_stats", {}).get("effective_fg_pct", ""),
+                game_data.get("home_stats", {}).get("true_shooting_pct", ""),
+                game_data.get("away_stats", {}).get("effective_fg_pct", ""),
+                game_data.get("away_stats", {}).get("true_shooting_pct", ""),
                 round(game_data.get("required_ppm", 0), 2),      # Required PPM
                 round(game_data.get("time_weighted_threshold", 0), 2),  # Time Weighted Threshold
                 round(game_data.get("current_ppm", 0), 2),       # Current PPM
@@ -174,6 +258,8 @@ class CSVLogger:
                 game_data.get("trigger_reasons", ""),            # Trigger Reasons
                 round(game_data.get("confidence_score", 0), 1),  # Confidence
                 game_data.get("unit_size", 0),                   # Units
+                game_data.get("bet_recommendation", "MONITOR"),  # Bet Recommendation
+                game_data.get("bet_status_reason", ""),          # Bet Status Reason
                 game_data.get("home_metrics", {}).get("pace_per_game", ""),     # Home Pace
                 game_data.get("home_metrics", {}).get("off_efficiency", ""),    # Home Off Eff
                 game_data.get("home_metrics", {}).get("def_efficiency", ""),    # Home Def Eff

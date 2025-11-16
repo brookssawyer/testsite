@@ -60,6 +60,17 @@ PPM_DIFFERENCE_THRESHOLD = 0.5  # Trigger when pace difference is significant (m
 # Legacy alias for backward compatibility
 PPM_THRESHOLD = PPM_THRESHOLD_UNDER
 
+# ========== BETTING OPTIMIZATION (Based on 39-game analysis) ==========
+# Minimum confidence to actually place a bet (vs just monitoring)
+MIN_CONFIDENCE_TO_BET = 65  # 65+ required to bet (analysis showed 64.1% win rate overall)
+
+# PPM confirmation threshold - wait for strong momentum before betting
+PPM_CONFIRMATION_THRESHOLD = 5.0  # 5.0+ PPM improves win rate from 64% to 71%
+
+# Block "danger zone" bets (medium confidence + weak PPM)
+BLOCK_DANGER_ZONE = True  # Block conf 60-70 with PPM < 4.0 (only 50% win rate)
+MEDIUM_CONF_MIN_PPM = 4.0  # Minimum PPM for medium confidence bets
+
 # Team stats refresh frequency (in hours)
 STATS_REFRESH_HOURS = 24
 
@@ -100,13 +111,14 @@ CONFIDENCE_WEIGHTS = {
     "pace_mismatch_penalty": -5,    # Unchanged (already balanced)
 }
 
-# Unit sizing based on confidence
+# Unit sizing based on confidence (OPTIMIZED - removed underperforming medium tier)
+# Based on 39-game analysis: Low 84.6% WR, Medium 47.6% WR, High 80% WR
 UNIT_SIZES = {
-    "no_bet": (0, 40),      # 0-40: Don't bet
-    "low": (41, 60),        # 41-60: 0.5 units
-    "medium": (61, 75),     # 61-75: 1 unit
-    "high": (76, 85),       # 76-85: 2 units
-    "max": (86, 100),       # 86-100: 3 units
+    "no_bet": (0, 49),      # 0-49: Don't bet (below analysis threshold)
+    "monitor": (50, 64),    # 50-64: Monitor only, don't bet (wait for confirmation)
+    "low": (65, 74),        # 65-74: 1 unit (good confidence)
+    "high": (75, 84),       # 75-84: 2 units (strong confidence)
+    "max": (85, 100),       # 85-100: 2.5-3 units (elite confidence)
 }
 
 # ========== DATABASE/STORAGE CONFIGURATION ==========
