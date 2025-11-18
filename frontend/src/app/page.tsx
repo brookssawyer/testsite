@@ -12,7 +12,7 @@ import RangeSlider from '@/components/RangeSlider';
 import SortControl from '@/components/SortControl';
 import Tooltip from '@/components/Tooltip';
 import PregamePredictions from '@/components/PregamePredictions';
-import { useWebSocket } from '@/hooks/useWebSocket';
+// import { useWebSocket } from '@/hooks/useWebSocket'; // Disabled - using HTTP polling
 import clsx from 'clsx';
 
 export default function Dashboard() {
@@ -27,15 +27,23 @@ export default function Dashboard() {
   const [selectedGameForModal, setSelectedGameForModal] = useState<any>(null);
   const [flashAlert, setFlashAlert] = useState(false);
 
-  // WebSocket connection for real-time game updates
-  const {
-    games: wsGames,
-    isConnected,
-    lastUpdate,
-    connectionCount,
-    error: wsError,
-    reconnect
-  } = useWebSocket();
+  // WebSocket disabled - using HTTP polling instead (ngrok limitation)
+  // const {
+  //   games: wsGames,
+  //   isConnected,
+  //   lastUpdate,
+  //   connectionCount,
+  //   error: wsError,
+  //   reconnect
+  // } = useWebSocket();
+
+  // Mock WebSocket values for HTTP polling mode
+  const wsGames: any[] = [];
+  const isConnected = true; // Always show as connected for polling mode
+  const lastUpdate: Date | null = null;
+  const connectionCount: number = 0;
+  const wsError: string | null = null;
+  const reconnect = () => {};
 
   const { data: perfData } = useSWR('performance', stats.getPerformance, {
     refreshInterval: 30000, // Refresh every 30 seconds for faster stats updates
@@ -127,8 +135,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-center gap-3">
             <span className="inline-block w-2.5 h-2.5 bg-white rounded-full animate-pulse shadow-glow-teal"></span>
             <span className="font-bold">LIVE</span>
-            <span className="opacity-90">• {connectionCount} connection{connectionCount !== 1 ? 's' : ''}</span>
-            {lastUpdate && <span className="text-xs opacity-75">• Updated: {lastUpdate.toLocaleTimeString()}</span>}
+            <span className="opacity-90">• HTTP Polling (10s refresh)</span>
           </div>
         ) : (
           <div className="flex items-center justify-center gap-3">
@@ -367,11 +374,9 @@ export default function Dashboard() {
               </div>
 
               <div className="flex gap-3 items-center">
-                {lastUpdate && (
-                  <span className="text-sm text-gray-400">
-                    Updated {lastUpdate.toLocaleTimeString()}
-                  </span>
-                )}
+                <span className="text-sm text-gray-400">
+                  HTTP Polling Mode
+                </span>
                 <button
                   onClick={reconnect}
                   disabled={isConnected}

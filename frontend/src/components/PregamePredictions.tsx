@@ -64,7 +64,7 @@ export default function PregamePredictions() {
       return response.json();
     },
     {
-      refreshInterval: 60000, // Refresh every 1 minute
+      refreshInterval: 10000, // Refresh every 10 seconds for live updates
       revalidateOnFocus: false,
     }
   );
